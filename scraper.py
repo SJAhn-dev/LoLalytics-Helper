@@ -358,7 +358,7 @@ def create_driver():
     if vm and vm.strip().isdigit():
         chrome_kwargs["version_main"] = int(vm.strip())
     else:
-        chrome_kwargs["version_main"] = 145
+        chrome_kwargs["version_main"] = 152
 
     driver = uc.Chrome(**chrome_kwargs)
     driver.set_page_load_timeout(60)

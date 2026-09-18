@@ -10,6 +10,11 @@ LOW_SAMPLE_COLOR = "#888888"
 NORMAL_SAMPLE_COLOR = "#111111"
 WARNING_ICON = "⚠"
 
+def resolve_writable_path(filename: str) -> str:
+    """User settings must survive one-file executable extraction/cleanup."""
+    base = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, filename)
+
 def resolve_resource_path(*path_parts: str) -> str:
     relative_path = os.path.join(*path_parts)
     candidates = []
@@ -333,4 +338,3 @@ class ScoreTooltip:
     def update_text_provider(self, text_provider):
         """텍스트 제공자 업데이트"""
         self.text_provider = text_provider
-

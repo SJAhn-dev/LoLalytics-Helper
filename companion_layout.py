@@ -32,7 +32,7 @@ class Rect:
 
 
 CLIENT_WIDTH, CLIENT_HEIGHT = 1280, 720
-WING_WIDTH, DOCK_HEIGHT = 224, 250
+WING_WIDTH, DOCK_HEIGHT = 304, 300
 
 
 def panel_layout(work, client, gap=0, min_wing=170, min_dock=240):
@@ -56,7 +56,7 @@ def panel_layout(work, client, gap=0, min_wing=170, min_dock=240):
 
 def suggested_client_rect(work):
     """Manual layout when League is closed; never resize the user's client."""
-    margin = 16
+    margin = max(0, min(16, (work.height - CLIENT_HEIGHT - DOCK_HEIGHT) // 2))
     width = max(1, min(CLIENT_WIDTH, work.width - 2 * (WING_WIDTH + margin),
                        (work.height - DOCK_HEIGHT - 2 * margin) * 16 // 9))
     height = max(1, round(width * 9 / 16))

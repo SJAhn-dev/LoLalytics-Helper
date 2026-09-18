@@ -42,7 +42,7 @@ def test_frame_joins_client_edges_and_dock_matches_both_wings(work, client):
     assert left.y == right.y == client.y
     assert left.bottom == right.bottom == client.bottom == dock.y
     assert dock.x == left.x and dock.right == right.right
-    assert dock.height == 250
+    assert dock.height == min(300, work.bottom - client.bottom)
     assert dock.width < work.width  # No monitor-wide bottom strip.
 
 
@@ -51,8 +51,8 @@ def test_default_layout_reserves_a_1280_by_720_client(work):
     client = suggested_client_rect(work)
     assert (client.width, client.height) == (1280, 720)
     layout = panel_layout(work, client)
-    assert layout["dock"].width == 1728
-    assert layout["dock"].height == 250
+    assert layout["dock"].width == 1888
+    assert layout["dock"].height == 300
 
 
 def test_bans_and_lane_changes_invalidate_signature():
@@ -268,7 +268,7 @@ def test_korean_cards_and_tree_keep_the_same_candidate_identity(gui_app):
     tree.selection_set("Jarvan IV")
     ui._select_tree(None)
     assert ui.selected_name == "Jarvan IV"
-    assert ui.basis_labels["allies"].cget("text").startswith("자르반 4세")
+    assert "자르반 4세" in ui.basis_labels["allies"].cget("text")
     ui.set_recommendations(list(reversed(rows)))
     assert ui.selected_name == "Jarvan IV"
 

@@ -13,6 +13,7 @@ from pathlib import Path
 from collections import defaultdict
 from companion_layout import enable_dpi_awareness, snapshot_signature
 from draft_companion import DraftCompanion, HEXTECH_THEME
+from ui_assets import UIAssets
 from op_duos_tab import OpDuosTab
 from ignore_tab import IgnoreTab
 from counter_synergy_tab import CounterSynergyTab
@@ -20,6 +21,7 @@ from credits_tab import CreditsTab
 from weight_settings_tab import WeightSettingsTab, load_weight_settings
 from common import (
     resolve_resource_path,
+    resolve_writable_path,
     AutocompletePopup,
     ScoreTooltip,
     LANES,
@@ -39,7 +41,7 @@ except ImportError:  # requests는 선택적 의존성
 
 ALIAS_FILE = resolve_resource_path("champion_aliases.json")
 IGNORED_CHAMPIONS_FILE = resolve_resource_path("ignored_champions.json")
-UI_SETTINGS_FILE = resolve_resource_path("ui_settings.json")
+UI_SETTINGS_FILE = resolve_writable_path("ui_settings.json")
 WEIGHT_SETTINGS_FILE = resolve_resource_path("weight_settings.json")
 DATA_DIR = Path(resolve_resource_path("data"))
 LOG_DIR = Path(resolve_resource_path("logs"))
@@ -1112,6 +1114,8 @@ class ChampionScraperApp:
         self.ui_settings = self._load_ui_settings()
         self.weight_settings = load_weight_settings()
         self.current_theme = HEXTECH_THEME
+        self.assets = UIAssets(root)
+        self.ui_font = self.assets.family
         self.recommend_counter_cache = {}
         self.champion_data_cache = self.preload_all_champion_data(Path(resolve_resource_path("data")))
         self._closing = False
@@ -1167,6 +1171,7 @@ class ChampionScraperApp:
         if self.client_watcher:
             self.client_watcher.stop()
         self.root.destroy()
+        self.assets.close()
 
     def apply_theme(self, theme=None):
         """현재 테마 또는 지정된 테마를 적용합니다."""
@@ -1222,7 +1227,7 @@ class ChampionScraperApp:
         style = ttk.Style(self.root)
         style.theme_use('clam')  # Use clam as base for better color customization
         
-        style.configure(".", background=bg_color, foreground=fg_color, font=("Segoe UI", 9))
+        style.configure(".", background=bg_color, foreground=fg_color, font=(self.ui_font, -13))
         style.configure("TFrame", background=bg_color)
         style.configure("TLabel", background=bg_color, foreground=fg_color)
         style.configure("TButton", background=button_color, foreground=button_fg, borderwidth=1)
@@ -1234,7 +1239,7 @@ class ChampionScraperApp:
                         bordercolor="#785A28", lightcolor=bg_color, darkcolor=bg_color)
         style.configure("TNotebook.Tab", background=accent_color, foreground=fg_color,
                         bordercolor="#253139", lightcolor=accent_color, darkcolor=accent_color,
-                        padding=[12, 3])
+                        padding=[16, 6])
         style.configure("Vertical.TScrollbar", background=accent_color, troughcolor=bg_color,
                         bordercolor=bg_color, arrowcolor=button_fg, lightcolor=accent_color,
                         darkcolor=accent_color, width=10)
@@ -1246,12 +1251,13 @@ class ChampionScraperApp:
             background=treeview_bg,
             foreground=fg_color,
             fieldbackground=treeview_bg,
-            borderwidth=0
+            borderwidth=0, bordercolor=accent_color, lightcolor=accent_color, darkcolor=accent_color
         )
         style.configure("Treeview.Heading", 
             background=treeview_heading_bg, 
             foreground=fg_color,
-            font=("Segoe UI", 9, "bold")
+            font=(self.ui_font, -12, "bold"), bordercolor=accent_color,
+            lightcolor=accent_color, darkcolor=accent_color
         )
         style.map("Treeview", background=[("selected", select_color)], foreground=[("selected", fg_color)])
         
@@ -3634,9 +3640,11 @@ class ChampionScraperApp:
     def _load_ui_settings(self):
         """Load UI settings from file"""
         try:
-            if os.path.exists(UI_SETTINGS_FILE):
-                with open(UI_SETTINGS_FILE, "r", encoding="utf-8") as f:
-                    return json.load(f)
+            path = UI_SETTINGS_FILE if os.path.exists(UI_SETTINGS_FILE) else resolve_resource_path('ui_settings.json')
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    value = json.load(f)
+                    return value if isinstance(value, dict) else {}
         except Exception:
             pass
         return {}
@@ -3644,10 +3652,13 @@ class ChampionScraperApp:
     def _save_ui_settings(self):
         """Save UI settings to file"""
         try:
-            with open(UI_SETTINGS_FILE, "w", encoding="utf-8") as f:
+            temporary = UI_SETTINGS_FILE + '.tmp'
+            with open(temporary, "w", encoding="utf-8") as f:
                 json.dump(self.ui_settings, f, indent=2)
-        except Exception:
-            pass
+            os.replace(temporary, UI_SETTINGS_FILE)
+            return True
+        except OSError:
+            return False
     
     def _restore_sash_position(self):
         """Restore PanedWindow sash position from saved settings"""

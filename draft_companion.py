@@ -8,6 +8,8 @@ from tkinter import ttk
 
 from common import LANES, AutocompletePopup, ScoreTooltip
 from companion_layout import Rect, WindowsClient, panel_layout, suggested_client_rect
+from draft_insights import current_pick, evaluate_pick, slot_suggestions, main_champions, save_main_champions
+from ui_widgets import GameButton
 
 VOID = "#010A13"
 PANEL = "#071521"
@@ -35,10 +37,7 @@ HEXTECH_THEME = {
 
 
 def button(parent, text, command, **kwargs):
-    return tk.Button(parent, text=text, command=command, bg=PANEL, fg=GOLD,
-                     activebackground=SELECT, activeforeground=TEXT,
-                     relief="flat", bd=0, highlightthickness=1,
-                     highlightbackground=METAL, padx=10, pady=4, **kwargs)
+    return GameButton(parent, text=text, command=command, **kwargs)
 
 
 def create_team_column(app, parent, title, side):
@@ -46,10 +45,10 @@ def create_team_column(app, parent, title, side):
     column = tk.Frame(parent, bg=VOID, highlightthickness=1, highlightbackground=METAL)
     tk.Frame(column, bg=team_accent, height=2).pack(fill="x")
     heading = tk.Label(column, text=title, bg=PANEL, fg=GOLD,
-                       font=("Malgun Gothic", 12, "bold"), anchor="w", padx=12, pady=10)
+                       font=(app.ui_font, -18, "bold"), anchor="w", padx=16, pady=12)
     heading.pack(fill="x")
     basis = tk.Label(column, text="하단에서 추천 후보를 선택하세요", bg=VOID,
-                     fg=MUTED, font=("Malgun Gothic", 8), anchor="w", padx=10, pady=7)
+                     fg=MUTED, font=(app.ui_font, -12), anchor="w", padx=16, pady=8)
     basis.pack(fill="x")
     app.draft_dashboard.basis_labels[side] = basis
     app.draft_dashboard.make_draggable(heading, parent)
@@ -75,27 +74,38 @@ def create_team_column(app, parent, title, side):
     canvas.configure(yscrollcommand=scrollbar.set)
     roster.bind("<Configure>", fit_roster)
     canvas.bind("<Configure>", fit_roster)
+    app.draft_dashboard.roster_fitters[side] = fit_roster
 
     for idx, lane in enumerate(LANES):
         row = tk.Frame(roster, bg=PANEL, highlightthickness=1, highlightbackground="#253139")
-        row.pack(fill="both", expand=True, padx=8, pady=4)
+        row.pack(fill="both", expand=True, padx=12, pady=4)
         summary = tk.Frame(row, bg=PANEL)
-        summary.pack(fill="both", expand=True, padx=10, pady=12)
-        summary.columnconfigure(0, weight=1)
-        summary.rowconfigure(0, weight=1)
-        summary.rowconfigure(1, weight=1)
+        summary.pack(fill="both", expand=True, padx=12, pady=6)
+        summary.columnconfigure(1, weight=1)
+        portrait = tk.Label(summary, bg=PANEL, fg=METAL, text="◇", width=3,
+                            font=(app.ui_font, -21))
+        portrait.grid(row=0, column=0, rowspan=2, padx=(0, 10), sticky="nw")
         name_var = tk.StringVar(value="선택 대기")
         name = tk.Button(summary, textvariable=name_var, anchor="w", relief="flat",
                          bg=PANEL, fg=TEXT, activebackground=SELECT,
-                         activeforeground=TEXT, font=("Malgun Gothic", 11, "bold"),
-                         bd=0, padx=0, pady=0)
-        name.grid(row=0, column=0, columnspan=2, sticky="ew")
+                         activeforeground=TEXT, font=(app.ui_font, -16, "bold"),
+                         bd=0, highlightthickness=0, padx=0, pady=0)
+        name.grid(row=0, column=1, sticky="ew")
         relation_var = tk.StringVar(value="—")
-        tk.Label(summary, textvariable=relation_var, bg=PANEL, fg=team_accent,
-                 font=("Segoe UI", 10)).grid(row=1, column=1, sticky="ne", padx=(3, 0))
         lane_var = tk.StringVar(value=LANE_NAMES[lane])
         tk.Label(summary, textvariable=lane_var, bg=PANEL, fg=MUTED,
-                 font=("Malgun Gothic", 9), anchor="w").grid(row=1, column=0, sticky="nw")
+                 font=(app.ui_font, -11), anchor="w").grid(row=1, column=1, sticky="nw")
+        comparison_var = tk.StringVar(value="조합을 입력하면 승률 비교를 표시합니다")
+        comparison = tk.Label(summary, textvariable=comparison_var, bg=PANEL, fg=team_accent,
+                              anchor="w", font=(app.ui_font, -12))
+        comparison.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(4, 2))
+        pair_var = tk.StringVar(value="내 라인을 선택하세요")
+        pair_label = tk.Label(summary, textvariable=pair_var, bg=PANEL, fg=MUTED,
+                             anchor="w", justify="left", font=(app.ui_font, -12), wraplength=252)
+        pair_label.grid(row=3, column=0, columnspan=2, sticky="ew")
+        summary.bind('<Configure>', lambda e, label=pair_label: label.configure(wraplength=max(100, e.width)))
+        for child in summary.winfo_children():
+            child.bind('<Configure>', lambda _e: canvas.after_idle(fit_roster), add='+')
 
         editor = tk.Frame(row, bg=PANEL, padx=6, pady=5)
         editor.columnconfigure(0, weight=1)
@@ -120,7 +130,7 @@ def create_team_column(app, parent, title, side):
                        fg=TEXT, selectcolor=VOID, activebackground=PANEL).pack(anchor="w")
         result = tk.StringVar(value="챔피언을 선택하세요")
         result_label = tk.Label(editor, textvariable=result, bg=PANEL, fg=MUTED,
-                                anchor="w", font=("Malgun Gothic", 8), wraplength=210)
+                                anchor="w", font=(app.ui_font, -12), wraplength=240)
         result_label.grid(row=3, column=0, columnspan=2, sticky="ew")
         slot = dict(side=side, index=idx, entry=entry, lane=lane_box, button=search,
                     clear_button=clear, result_var=result, result_label=result_label,
@@ -128,7 +138,8 @@ def create_team_column(app, parent, title, side):
                     canonical_name=None, selected_lane=None, synergy_dataset=None,
                     counter_dataset=None, last_lane_value=None, last_lane=None,
                     score_details=None, name_var=name_var, lane_var=lane_var,
-                    relation_var=relation_var, frame=row, editor=editor)
+                    relation_var=relation_var, frame=row, editor=editor, portrait=portrait,
+                    comparison_var=comparison_var, comparison_label=comparison, pair_var=pair_var)
 
         def toggle(s=slot):
             if s["editor"].winfo_manager():
@@ -150,6 +161,7 @@ def create_team_column(app, parent, title, side):
             display_formatter=app.format_display_name,
             on_select=lambda _value, s=slot: app.perform_banpick_search(s))
         slot["tooltip"] = ScoreTooltip(result_label, lambda s=slot: app._get_score_tooltip_text(s))
+        slot['comparison_tooltip'] = ScoreTooltip(comparison, lambda s=slot: app.draft_dashboard.comparison_note(s))
         app._update_slot_lane_cache(slot)
         app.banpick_slots[side].append(slot)
 
@@ -166,8 +178,11 @@ class DraftCompanion:
         self.app, self.root = app, app.root
         self.native = WindowsClient()
         self.windows, self.basis_labels = {}, {}
+        self.roster_fitters = {}
         self.records, self.selected_name = {}, None
         self.cards = []
+        self.components, self.recommendations = {}, []
+        self.current_profile = None
         self.closed = False
         self.job = None
         self.last_geometry = None
@@ -203,13 +218,15 @@ class DraftCompanion:
                           highlightbackground=METAL)
         chrome.grid(row=0, column=0, sticky="ew")
         brand = tk.Label(chrome, text="  ◇  LoLALYTICS  /  DRAFT COMPANION", bg=PANEL,
-                         fg=GOLD, font=("Segoe UI", 9, "bold"), anchor="w", pady=3)
+                         fg=GOLD, font=(app.ui_font, -13, "bold"), anchor="w", pady=6)
         brand.pack(side="left", fill="x", expand=True)
         self.make_draggable(brand, self.root)
-        self.close_button = button(chrome, "✕", app.close)
+        self.close_button = button(chrome, "✕", app.close, pady=3, padx=12)
         self.close_button.pack(side="right", padx=(0, 1))
-        self.minimize_button = button(chrome, "—", self._minimize)
+        self.minimize_button = button(chrome, "—", self._minimize, pady=3, padx=12)
         self.minimize_button.pack(side="right", padx=1)
+        tk.Label(chrome, textvariable=self.layout_status, bg=PANEL, fg=MUTED,
+                 font=(app.ui_font, -12)).pack(side='right', padx=18)
         frame.configure(bg=VOID)
         app.banpick_slots = {"allies": [], "enemies": []}
         app.my_lane_var = tk.StringVar(value="")
@@ -217,9 +234,9 @@ class DraftCompanion:
         app.my_lane_var.trace_add("write", lambda *_: app.update_banpick_recommendations())
 
         top = tk.Frame(frame, bg=VOID)
-        top.pack(fill="x", padx=12, pady=(6, 3))
-        tk.Label(top, text="추천 챔피언", fg=TEXT, bg=VOID,
-                 font=("Segoe UI", 11, "bold")).pack(side="left")
+        top.pack(fill="x", padx=20, pady=(10, 6))
+        tk.Label(top, text="전체 조합 추천", fg=TEXT, bg=VOID,
+                 font=(app.ui_font, -18, "bold")).pack(side="left")
         tk.Label(top, textvariable=app.lcu_status_var, fg=MUTED, bg=VOID).pack(side="left", padx=15)
         app.lcu_check_button = button(top, "연결", app.on_lcu_check_clicked,
                                       state="normal" if app.client_sync_supported else "disabled")
@@ -229,13 +246,14 @@ class DraftCompanion:
         app.client_sync_checkbox.pack(side="right", padx=8)
 
         tools = tk.Frame(frame, bg=VOID)
-        tools.pack(fill="x", padx=12, pady=3)
+        tools.pack(fill="x", padx=20, pady=(0, 6))
         tk.Label(tools, text="내 라인", bg=VOID, fg=MUTED).pack(side="left", padx=(0, 8))
+        self.lane_buttons = {}
         for lane, label in LANE_NAMES.items():
-            tk.Radiobutton(tools, text=label, variable=app.my_lane_var, value=lane,
-                           indicatoron=False, bg=PANEL, fg=TEXT, selectcolor=SELECT,
-                           activebackground=SELECT, relief="flat", width=5,
-                           borderwidth=0, padx=4, pady=4).pack(side="left", padx=2)
+            lane_button = button(tools, label, lambda value=lane: app.my_lane_var.set(value), pady=5)
+            lane_button.pack(side="left", padx=(0, 6))
+            self.lane_buttons[lane] = lane_button
+        app.my_lane_var.trace_add('write', lambda *_: self._paint_lanes())
         button(tools, "전체 순위 / 필터", self.toggle_list).pack(side="left", padx=10)
         button(tools, "기본 배치", self.arrange_default).pack(side="right")
         tk.Checkbutton(tools, text="클라이언트 따라가기", variable=self.follow,
@@ -258,14 +276,33 @@ class DraftCompanion:
         app.client_fetch_button = FetchAction()
 
         self.card_frame = tk.Frame(frame, bg=VOID)
-        self.card_frame.pack(fill="both", expand=True, padx=12, pady=5)
-        for idx in range(3):
+        self.card_frame.pack(fill="both", expand=True, padx=20, pady=6)
+        for idx in range(2):
             self.card_frame.columnconfigure(idx, weight=1, uniform="candidates")
             card = button(self.card_frame, f"{idx+1:02d}   추천 대기", lambda i=idx: self.select_card(i),
-                          anchor="w", justify="left", font=("Malgun Gothic", 11))
-            card.grid(row=0, column=idx, sticky="nsew", padx=(0, 8 if idx < 2 else 0))
+                          anchor="w", justify="left", font=(app.ui_font, -15), pady=10, padx=18)
+            card.grid(row=0, column=idx, sticky="nsew", padx=(0, 12))
             self.cards.append(card)
         self.card_frame.rowconfigure(0, weight=1)
+        self.card_frame.columnconfigure(2, weight=1, uniform='candidates')
+        favorites = tk.Frame(self.card_frame, bg=PANEL, highlightthickness=1, highlightbackground=METAL)
+        favorites.grid(row=0, column=2, sticky='nsew')
+        favorites_head = tk.Frame(favorites, bg=PANEL)
+        favorites_head.pack(fill='x', padx=12, pady=(7, 3))
+        tk.Label(favorites_head, text='나의 주 챔피언', bg=PANEL, fg=GOLD,
+                 font=(app.ui_font, -15, 'bold')).pack(side='left')
+        button(favorites_head, '설정', self.edit_favorites, pady=2, padx=10).pack(side='right')
+        favorite_body = tk.Frame(favorites, bg=PANEL)
+        favorite_body.pack(fill='both', expand=True, padx=10, pady=(0, 8))
+        self.favorite_tree = ttk.Treeview(favorite_body, columns=('name', 'score', 'coverage'), show='headings', height=2)
+        for col, title, width in (('name', '챔피언', 130), ('score', '현재 점수', 95), ('coverage', '근거 / 상태', 150)):
+            self.favorite_tree.heading(col, text=title)
+            self.favorite_tree.column(col, width=width, minwidth=60, stretch=True)
+        favorite_scroll = ttk.Scrollbar(favorite_body, orient='vertical', command=self.favorite_tree.yview)
+        self.favorite_tree.configure(yscrollcommand=favorite_scroll.set)
+        favorite_scroll.pack(side='right', fill='y')
+        self.favorite_tree.pack(side='left', fill='both', expand=True)
+        self.favorite_tree.bind('<<TreeviewSelect>>', self.select_favorite)
 
         self.list_frame = tk.Frame(frame, bg=VOID)
         filters = tk.Frame(self.list_frame, bg=VOID)
@@ -298,11 +335,9 @@ class DraftCompanion:
         app.recommend_tree.bind("<<TreeviewSelect>>", self._select_tree)
 
         footer = tk.Frame(frame, bg=VOID)
-        footer.pack(fill="x", padx=12, pady=(2, 6))
+        footer.pack(fill="x", padx=20, pady=(3, 9))
         self.footer = footer
         tk.Label(footer, textvariable=self.detail, bg=VOID, fg=GOLD, anchor="w").pack(fill="x")
-        tk.Label(footer, textvariable=self.layout_status, bg=VOID, fg=MUTED,
-                 anchor="w", font=("Malgun Gothic", 8)).pack(fill="x")
         app.team_total_labels, app.ban_labels = {}, {}
         for side, title in (("allies", "우리 팀  /  시너지"), ("enemies", "상대 팀  /  상성")):
             window = tk.Toplevel(self.root)
@@ -319,10 +354,120 @@ class DraftCompanion:
     def toggle_list(self):
         if self.list_frame.winfo_manager():
             self.list_frame.pack_forget()
-            self.card_frame.pack(fill="both", expand=True, padx=12, pady=5, before=self.footer)
+            self.card_frame.pack(fill="both", expand=True, padx=20, pady=6, before=self.footer)
         else:
             self.card_frame.pack_forget()
             self.list_frame.pack(fill="both", expand=True, padx=12, pady=5, before=self.footer)
+
+    def _paint_lanes(self):
+        for lane, control in self.lane_buttons.items():
+            active = lane == self.app.my_lane_var.get()
+            control.configure(bg=SELECT if active else PANEL,
+                              highlightbackground=CYAN if active else METAL)
+
+    def edit_favorites(self):
+        app = self.app
+        dialog = tk.Toplevel(self.root)
+        dialog.title('나의 주 챔피언 · 라인별 설정')
+        dialog.geometry('500x380')
+        dialog.configure(bg=VOID, padx=20, pady=18)
+        dialog.transient(self.root)
+        tk.Label(dialog, text='주 챔피언을 저장하면 현재 조합 점수를 계속 비교합니다.',
+                 bg=VOID, fg=TEXT, anchor='w').pack(fill='x', pady=(0, 12))
+        lane_box = ttk.Combobox(dialog, values=list(LANE_NAMES.values()), state='readonly')
+        lane_box.set(LANE_NAMES.get(app.my_lane_var.get(), '탑'))
+        lane_box.pack(fill='x', pady=(0, 10))
+        entry = tk.Entry(dialog, relief='flat', font=(app.ui_font, -16))
+        entry.pack(fill='x', ipady=8)
+        message = tk.StringVar(value='챔피언을 검색하고 추가하세요. 라인별 최대 8개.')
+        tk.Label(dialog, textvariable=message, fg=MUTED, bg=VOID, anchor='w').pack(fill='x', pady=8)
+        listing = tk.Listbox(dialog, selectmode='extended', bg=PANEL, fg=TEXT,
+                             selectbackground=SELECT, relief='flat', height=6)
+        listing.pack(fill='both', expand=True, pady=(0, 12))
+
+        def lane():
+            return next(k for k, v in LANE_NAMES.items() if v == lane_box.get())
+        def values():
+            return main_champions(app, lane())
+        def refresh():
+            listing.delete(0, 'end')
+            for name in values():
+                listing.insert('end', app.format_display_name(name))
+        def save(names):
+            saved = save_main_champions(app, lane(), names)
+            refresh()
+            self.refresh_favorites()
+            message.set('저장했습니다.' if saved is not False else '파일 저장 실패 · 실행 파일 폴더의 쓰기 권한을 확인하세요.')
+            return saved
+        def add():
+            name = app.resolve_champion_name(entry.get())
+            if not name:
+                message.set('공식 챔피언 이름이나 검색 별칭을 입력하세요.')
+                return
+            names = values()
+            if name not in names and len(names) < 8:
+                saved = save(names + [name])
+                entry.delete(0, 'end')
+                if saved is not False:
+                    message.set('저장했습니다. 해당 라인을 선택하면 점수가 표시됩니다.')
+            else:
+                message.set('이미 등록되어 있거나 최대 8개를 채웠습니다.')
+        def remove():
+            selected = set(listing.curselection())
+            save([name for i, name in enumerate(values()) if i not in selected])
+        actions = tk.Frame(dialog, bg=VOID)
+        actions.pack(fill='x')
+        button(actions, '추가', add).pack(side='left', padx=(0, 8))
+        button(actions, '선택 삭제', remove).pack(side='left')
+        button(actions, '닫기', dialog.destroy).pack(side='right')
+        entry.bind('<Return>', lambda _e: add())
+        lane_box.bind('<<ComboboxSelected>>', lambda _e: refresh())
+        dialog.autocomplete = AutocompletePopup(entry, app.get_autocomplete_candidates,
+                                               display_formatter=app.format_display_name)
+        refresh()
+        entry.focus_set()
+
+    def refresh_favorites(self):
+        tree, app = self.favorite_tree, self.app
+        selected = tree.selection()
+        tree.delete(*tree.get_children())
+        self.favorite_profiles = {}
+        lane = app.my_lane_var.get()
+        names = main_champions(app, lane) if lane in LANES else []
+        for name in dict.fromkeys(names):
+            profile = evaluate_pick(app, name)
+            self.favorite_profiles[name] = profile
+            score = f"{profile['total']:.2f}" if profile['total'] is not None else '—'
+            status = profile['status'] or f"{profile['known']}/{profile['expected']} 관계"
+            tree.insert('', 'end', iid=name, values=(app.format_display_name(name), score, status))
+        if not names:
+            tree.insert('', 'end', iid='__empty__', values=('설정에서 주 챔피언 추가', '—', LANE_NAMES.get(lane, '라인 선택')))
+        elif selected and selected[0] in names:
+            tree.selection_set(selected)
+
+    def select_favorite(self, _event=None):
+        selected = self.favorite_tree.selection()
+        profile = self.favorite_profiles.get(selected[0]) if selected else None
+        if not profile or profile['total'] is None or profile['status']:
+            return
+        name = selected[0]
+        row = (name, profile['total'], profile['synergy'] or 0, profile['counter'] or 0,
+               [], [], profile['known'] < profile['expected'], [])
+        data = dict(synergy_relations=profile['synergy_relations'], counter_relations=profile['counter_relations'],
+                    known_relations=profile['known'], expected_relations=profile['expected'])
+        self.records[name] = (row, data)
+        self.selected_name = name
+        self._show_selected()
+
+    def comparison_note(self, slot):
+        field = 'synergy_relations' if slot['side'] == 'allies' else 'counter_relations'
+        chosen = self.records.get(self.selected_name, (None, {}))[1].get(field, {}).get(slot['index'])
+        current = (self.current_profile or {}).get(field, {}).get(slot['index'])
+        lines = ['해당 라인 관계의 과거 표본 승률입니다. 전체 게임의 승리 확률이 아닙니다.']
+        for label, relation in (('현재 픽', current), ('비교 후보', chosen)):
+            lines.append(f"{label}: {relation['win_rate']:.1f}% / {relation['games']:,}게임" if relation else f'{label}: 자료 없음')
+        lines.append('각 슬롯의 추천 2개는 해당 관계 기준, 하단 추천 2개는 전체 조합 기준입니다.')
+        return '\n'.join(lines)
 
     def _follow_changed(self):
         self.app.ui_settings["client_follow"] = self.follow.get()
@@ -424,19 +569,27 @@ class DraftCompanion:
                 lane = slot["lane"].get()
                 is_me = side == "allies" and lane == my_lane
                 slot["name_var"].set(slot.get("display_name") or "선택 대기")
+                portrait = self.app.assets.portrait(slot.get('canonical_name'), size=30)
+                slot['portrait'].configure(image=portrait or '', text='' if portrait else '◇',
+                                          width=32 if portrait else 3, height=32 if portrait else 1)
                 suffix = " · 내 라인" if is_me else ""
                 if slot["manual_var"].get():
                     suffix += " · 라인 고정"
                 if slot["exclude_var"].get():
                     suffix += " · 제외"
+                if not is_me and my_lane in LANE_NAMES:
+                    suffix += f" · {LANE_NAMES[my_lane]} {'시너지' if side == 'allies' else '상성'}"
                 slot["lane_var"].set(LANE_NAMES.get(lane, lane) + suffix)
                 slot["frame"].configure(highlightbackground=CYAN if is_me else "#253139")
 
     def set_recommendations(self, recommendations, components=None):
         self.refresh_slots()
         components = components or {}
-        self.records = {row[0]: (row, components.get(row[0], {})) for row in recommendations[:20]}
-        self.card_names = list(self.records)[:3]
+        self.components, self.recommendations = components, recommendations
+        picked = current_pick(self.app)
+        self.current_profile = evaluate_pick(self.app, picked) if picked else None
+        self.records = {row[0]: (row, components.get(row[0], {})) for row in recommendations}
+        self.card_names = list(self.records)[:2]
         if self.selected_name not in self.records:
             self.selected_name = next(iter(self.records), None)
         for idx, card in enumerate(self.cards):
@@ -446,8 +599,14 @@ class DraftCompanion:
             name = self.card_names[idx]
             row, data = self.records[name]
             missing = data.get("missing_relations", 0)
-            reason = f"관계 {missing}개 자료 없음" if missing else (" · ".join(row[7]) or "조합 근거 확인")
-            card.configure(text=f"{idx+1:02d}   {self.app.format_display_name(name)}   ·   추천 점수 {row[1]:.2f}\n{reason}", state="normal")
+            profile = evaluate_pick(self.app, name)
+            matchup = profile['lane_matchup']
+            duel = (f"vs {self.app.format_display_name(matchup['champion'])}  {matchup['win_rate']:.1f}%"
+                    if matchup else '라인 상대 자료 없음')
+            coverage = f"근거 {data.get('known_relations', 0)}/{data.get('expected_relations', 0)}"
+            reason = f"{coverage} · {missing}개 누락" if missing else coverage
+            card.configure(text=f"{idx+1:02d}  {self.app.format_display_name(name)}    {row[1]:.2f}점\n{duel}\n{reason}", state="normal")
+        self.refresh_favorites()
         self._show_selected()
 
     def select_card(self, index):
@@ -482,6 +641,9 @@ class DraftCompanion:
             row, values = data
             self.detail.set(f"{self.app.format_display_name(row[0])}  |  시너지 {row[2]:.2f}  ·  상성 {row[3]:.2f}  |  "
                             f"확인된 관계 {values.get('known_relations', 0)} / {values.get('expected_relations', 0)}")
+            if self.current_profile and self.current_profile['total'] is not None:
+                current = self.current_profile
+                self.detail.set(self.detail.get() + f"   ·   현재 픽 {self.app.format_display_name(current['champion'])} {current['total']:.2f}점 ({current['known']}/{current['expected']} 관계)")
             tree = self.app.recommend_tree
             for item in tree.get_children():
                 name = self._tree_record_name(item)
@@ -490,7 +652,7 @@ class DraftCompanion:
                         tree.selection_set(item)
                     break
         for side, field in (("allies", "synergy_relations"), ("enemies", "counter_relations")):
-            self.basis_labels[side].configure(text=(f"{self.app.format_display_name(self.selected_name)} 기준 관계별 승률" if data else "하단에서 추천 후보를 선택하세요"))
+            self.basis_labels[side].configure(text=(f"비교 후보 · {self.app.format_display_name(self.selected_name)}" if data else "하단에서 추천 후보를 선택하세요"))
             relations = data[1].get(field, {}) if data else {}
             for slot in self.app.banpick_slots[side]:
                 relation = relations.get(slot["index"])
@@ -498,3 +660,32 @@ class DraftCompanion:
                 own = side == "allies" and slot["lane"].get() == self.app.my_lane_var.get()
                 text = f"{relation['win_rate']:.1f}%" if relation else ("자료 없음" if data and active and not own else "—")
                 slot["relation_var"].set(text)
+                baseline = (self.current_profile or {}).get(field, {}).get(slot['index'])
+                if own:
+                    score = (self.current_profile or {}).get('total')
+                    slot['comparison_var'].set(f"현재 픽 · 조합 점수 {score:.2f}" if score is not None else '현재 픽 · 관계 자료 없음')
+                    slot['pair_var'].set('전체 조합 추천 1·2순위는 하단에서 비교')
+                    continue
+                if not active:
+                    slot['comparison_var'].set('분석 제외' if slot['exclude_var'].get() else '챔피언을 선택하세요')
+                    slot['pair_var'].set('')
+                    continue
+                if relation and baseline:
+                    delta = relation['win_rate'] - baseline['win_rate']
+                    slot['comparison_var'].set(f"현재 {baseline['win_rate']:.1f}% → 후보 {relation['win_rate']:.1f}%  ({delta:+.1f}%p)")
+                elif relation:
+                    slot['comparison_var'].set(f"후보 {relation['win_rate']:.1f}% · 현재 픽 자료 없음")
+                elif baseline:
+                    slot['comparison_var'].set(f"현재 {baseline['win_rate']:.1f}% · 후보 자료 없음")
+                else:
+                    slot['comparison_var'].set('승률 비교 자료 없음')
+                best = slot_suggestions(self.recommendations, self.components, side, slot['index'])
+                lane = LANE_NAMES.get(self.app.my_lane_var.get(), '내 라인')
+                label = f"함께 좋은 {lane}" if side == 'allies' else f"상대하기 좋은 {lane}"
+                options = '  ·  '.join(f"{i+1} {self.app.format_display_name(n)} {r['win_rate']:.1f}%"
+                                       for i, (n, r, _score) in enumerate(best))
+                slot['pair_var'].set(options if options else f"{label} · 자료 없음")
+        # Text can change requested height without a Configure event on the
+        # fixed-size canvas window. Refit after Tk propagates child requests.
+        for fit in self.roster_fitters.values():
+            self.root.after_idle(lambda callback=fit: self.root.after_idle(callback))

@@ -1107,7 +1107,7 @@ class ChampionScraperApp:
             pass
         self.root.geometry("1100x300")
         self.root.minsize(760, 200)
-        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_rowconfigure(1, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
         self.ui_settings = self._load_ui_settings()
         self.weight_settings = load_weight_settings()
@@ -1136,7 +1136,7 @@ class ChampionScraperApp:
         self.client_sync_var = tk.BooleanVar(value=True)
         self.apply_theme()
         self.notebook = ttk.Notebook(root)
-        self.notebook.grid(row=0, column=0, sticky="nsew")
+        self.notebook.grid(row=1, column=0, sticky="nsew", padx=1, pady=(0, 1))
         self.dashboard_tab = tk.Frame(self.notebook)
         self.notebook.add(self.dashboard_tab, text="밴픽")
         self.build_dashboard_tab()
@@ -1230,8 +1230,14 @@ class ChampionScraperApp:
             background=[("pressed", button_pressed_bg), ("active", button_active_bg), ("disabled", disabled_bg)],
             foreground=[("pressed", button_fg), ("active", button_fg), ("disabled", disabled_fg)]
         )
-        style.configure("TNotebook", background=bg_color, tabposition='n')
-        style.configure("TNotebook.Tab", background=accent_color, foreground=fg_color, padding=[10, 2])
+        style.configure("TNotebook", background=bg_color, tabposition='nw', borderwidth=0,
+                        bordercolor="#785A28", lightcolor=bg_color, darkcolor=bg_color)
+        style.configure("TNotebook.Tab", background=accent_color, foreground=fg_color,
+                        bordercolor="#253139", lightcolor=accent_color, darkcolor=accent_color,
+                        padding=[12, 3])
+        style.configure("Vertical.TScrollbar", background=accent_color, troughcolor=bg_color,
+                        bordercolor=bg_color, arrowcolor=button_fg, lightcolor=accent_color,
+                        darkcolor=accent_color, width=10)
         style.map("TNotebook.Tab",
             background=[("selected", select_color)],
             foreground=[("selected", fg_color)]

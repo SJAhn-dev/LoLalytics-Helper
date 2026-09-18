@@ -16,6 +16,7 @@ METAL = "#785A28"
 TEXT = "#F0E6D2"
 MUTED = "#A09B8C"
 CYAN = "#0AC8B9"
+RIVAL = "#C89087"
 SELECT = "#12313B"
 LANE_NAMES = dict(zip(LANES, ("탑", "정글", "미드", "바텀", "서포터")))
 
@@ -41,7 +42,9 @@ def button(parent, text, command, **kwargs):
 
 
 def create_team_column(app, parent, title, side):
+    team_accent = CYAN if side == "allies" else RIVAL
     column = tk.Frame(parent, bg=VOID, highlightthickness=1, highlightbackground=METAL)
+    tk.Frame(column, bg=team_accent, height=2).pack(fill="x")
     heading = tk.Label(column, text=title, bg=PANEL, fg=GOLD,
                        font=("Malgun Gothic", 12, "bold"), anchor="w", padx=12, pady=10)
     heading.pack(fill="x")
@@ -55,32 +58,44 @@ def create_team_column(app, parent, title, side):
     scroll_area.pack(fill="both", expand=True)
     canvas = tk.Canvas(scroll_area, bg=VOID, bd=0, highlightthickness=0, width=170)
     scrollbar = ttk.Scrollbar(scroll_area, orient="vertical", command=canvas.yview)
-    canvas.configure(yscrollcommand=scrollbar.set)
-    scrollbar.pack(side="right", fill="y")
     canvas.pack(side="left", fill="both", expand=True)
     roster = tk.Frame(canvas, bg=VOID)
     item = canvas.create_window((0, 0), anchor="nw", window=roster)
-    roster.bind("<Configure>", lambda _e: canvas.configure(scrollregion=canvas.bbox("all")))
-    canvas.bind("<Configure>", lambda e: canvas.itemconfigure(item, width=e.width))
+    def fit_roster(_event=None):
+        needed = roster.winfo_reqheight()
+        canvas.itemconfigure(item, width=canvas.winfo_width(),
+                             height=max(canvas.winfo_height(), needed))
+        canvas.configure(scrollregion=canvas.bbox("all"))
+        if needed > canvas.winfo_height() + 1:
+            if not scrollbar.winfo_manager():
+                scrollbar.pack(side="right", fill="y", before=canvas)
+        elif scrollbar.winfo_manager():
+            scrollbar.pack_forget()
+            canvas.yview_moveto(0)
+    canvas.configure(yscrollcommand=scrollbar.set)
+    roster.bind("<Configure>", fit_roster)
+    canvas.bind("<Configure>", fit_roster)
 
     for idx, lane in enumerate(LANES):
         row = tk.Frame(roster, bg=PANEL, highlightthickness=1, highlightbackground="#253139")
-        row.pack(fill="x", padx=5, pady=3)
+        row.pack(fill="both", expand=True, padx=8, pady=4)
         summary = tk.Frame(row, bg=PANEL)
-        summary.pack(fill="x", padx=6, pady=5)
+        summary.pack(fill="both", expand=True, padx=10, pady=12)
         summary.columnconfigure(0, weight=1)
+        summary.rowconfigure(0, weight=1)
+        summary.rowconfigure(1, weight=1)
         name_var = tk.StringVar(value="선택 대기")
         name = tk.Button(summary, textvariable=name_var, anchor="w", relief="flat",
                          bg=PANEL, fg=TEXT, activebackground=SELECT,
-                         activeforeground=TEXT, font=("Malgun Gothic", 10, "bold"),
+                         activeforeground=TEXT, font=("Malgun Gothic", 11, "bold"),
                          bd=0, padx=0, pady=0)
-        name.grid(row=0, column=0, sticky="ew")
+        name.grid(row=0, column=0, columnspan=2, sticky="ew")
         relation_var = tk.StringVar(value="—")
-        tk.Label(summary, textvariable=relation_var, bg=PANEL, fg=CYAN,
-                 font=("Segoe UI", 10)).grid(row=0, column=1, rowspan=2, padx=(3, 0))
+        tk.Label(summary, textvariable=relation_var, bg=PANEL, fg=team_accent,
+                 font=("Segoe UI", 10)).grid(row=1, column=1, sticky="ne", padx=(3, 0))
         lane_var = tk.StringVar(value=LANE_NAMES[lane])
         tk.Label(summary, textvariable=lane_var, bg=PANEL, fg=MUTED,
-                 font=("Malgun Gothic", 8), anchor="w").grid(row=1, column=0, sticky="w")
+                 font=("Malgun Gothic", 9), anchor="w").grid(row=1, column=0, sticky="nw")
 
         editor = tk.Frame(row, bg=PANEL, padx=6, pady=5)
         editor.columnconfigure(0, weight=1)
@@ -166,6 +181,15 @@ class DraftCompanion:
         self.app.notebook.bind("<<NotebookTabChanged>>", lambda _e: self._visibility(), add="+")
         self.root.bind("<Destroy>", self._destroyed, add="+")
         self.root.bind("<FocusIn>", self._raise_wings, add="+")
+        self.root.bind("<Map>", self._restore_chrome, add="+")
+
+    def _restore_chrome(self, event):
+        if event.widget is self.root:
+            self.root.after_idle(lambda: self.native.compact_chrome(self.root))
+
+    def _minimize(self):
+        self._visibility(False)
+        self.root.iconify()
 
     def _raise_wings(self, event):
         if event.widget is self.root and self._active():
@@ -175,6 +199,17 @@ class DraftCompanion:
 
     def _build(self):
         app, frame = self.app, self.app.dashboard_tab
+        chrome = tk.Frame(self.root, bg=PANEL, highlightthickness=1,
+                          highlightbackground=METAL)
+        chrome.grid(row=0, column=0, sticky="ew")
+        brand = tk.Label(chrome, text="  ◇  LoLALYTICS  /  DRAFT COMPANION", bg=PANEL,
+                         fg=GOLD, font=("Segoe UI", 9, "bold"), anchor="w", pady=3)
+        brand.pack(side="left", fill="x", expand=True)
+        self.make_draggable(brand, self.root)
+        self.close_button = button(chrome, "✕", app.close)
+        self.close_button.pack(side="right", padx=(0, 1))
+        self.minimize_button = button(chrome, "—", self._minimize)
+        self.minimize_button.pack(side="right", padx=1)
         frame.configure(bg=VOID)
         app.banpick_slots = {"allies": [], "enemies": []}
         app.my_lane_var = tk.StringVar(value="")
@@ -183,7 +218,7 @@ class DraftCompanion:
 
         top = tk.Frame(frame, bg=VOID)
         top.pack(fill="x", padx=12, pady=(6, 3))
-        tk.Label(top, text="LoLALYTICS  /  DRAFT COMPANION", fg=GOLD, bg=VOID,
+        tk.Label(top, text="추천 챔피언", fg=TEXT, bg=VOID,
                  font=("Segoe UI", 11, "bold")).pack(side="left")
         tk.Label(top, textvariable=app.lcu_status_var, fg=MUTED, bg=VOID).pack(side="left", padx=15)
         app.lcu_check_button = button(top, "연결", app.on_lcu_check_clicked,
@@ -228,7 +263,7 @@ class DraftCompanion:
             self.card_frame.columnconfigure(idx, weight=1, uniform="candidates")
             card = button(self.card_frame, f"{idx+1:02d}   추천 대기", lambda i=idx: self.select_card(i),
                           anchor="w", justify="left", font=("Malgun Gothic", 11))
-            card.grid(row=0, column=idx, sticky="nsew", padx=(0, 8 if idx < 2 else 0), ipady=8)
+            card.grid(row=0, column=idx, sticky="nsew", padx=(0, 8 if idx < 2 else 0))
             self.cards.append(card)
         self.card_frame.rowconfigure(0, weight=1)
 
@@ -298,14 +333,17 @@ class DraftCompanion:
         origin = {}
         def start(event):
             origin.update(x=event.x_root, y=event.y_root,
-                          wx=window.winfo_x(), wy=window.winfo_y())
+                          panels=[(w, Rect(w.winfo_x(), w.winfo_y(),
+                                           w.winfo_width(), w.winfo_height()))
+                                  for w in [self.root, *self.windows.values()]])
         def drag(event):
             if not origin:
                 return
             self.follow.set(False)
-            self.layout_status.set("수동 배치 · 패널 제목을 끌어 이동할 수 있습니다")
-            self.native.place(window, Rect(origin["wx"]+event.x_root-origin["x"],
-                origin["wy"]+event.y_root-origin["y"], window.winfo_width(), window.winfo_height()))
+            self.layout_status.set("수동 배치 · 프레임을 함께 이동 · 기본 배치로 클라이언트에 맞추기")
+            for panel, rect in origin["panels"]:
+                self.native.place(panel, Rect(rect.x+event.x_root-origin["x"],
+                    rect.y+event.y_root-origin["y"], rect.width, rect.height))
         heading.bind("<ButtonPress-1>", start)
         heading.bind("<B1-Motion>", drag)
 
@@ -324,6 +362,7 @@ class DraftCompanion:
                 window.withdraw()
 
     def _place_layout(self, layout):
+        self.native.compact_chrome(self.root)
         for side, window in self.windows.items():
             self.native.place(window, layout[side])
         self.native.place(self.root, layout["dock"])
@@ -341,10 +380,10 @@ class DraftCompanion:
         layout = panel_layout(*found) if found else panel_layout(work, suggested_client_rect(work))
         if layout:
             self._place_layout(layout)
-            self.layout_status.set("중앙은 실제 LoL 클라이언트 자리 · 제목을 끌어 수동 배치 · 추천 점수 ≠ 승률")
+            self.layout_status.set("클라이언트를 감싸는 프레임 · 제목을 끌어 이동 · 추천 점수 ≠ 승률")
         else:
             self._visibility(False)
-            self.layout_status.set("클라이언트 양옆 170px·아래 250px 이상 공간을 확보한 후 기본 배치를 누르세요")
+            self.layout_status.set("클라이언트 양옆 170px·아래 240px 이상 공간을 확보한 후 기본 배치를 누르세요")
 
     def _tick(self):
         if self.closed:
@@ -358,7 +397,7 @@ class DraftCompanion:
                     if layout:
                         if layout != self.last_geometry:
                             self._place_layout(layout)
-                        self.layout_status.set("클라이언트 옆에 배치됨 · 추천 점수 ≠ 승률")
+                        self.layout_status.set(f"{found[1].width} × {found[1].height} 클라이언트에 맞춤 · 추천 점수 ≠ 승률")
                     else:
                         visible = False
                         self.layout_status.set("배치 공간 부족 · 클라이언트를 줄이거나 이동한 후 다시 배치하세요")
@@ -408,7 +447,7 @@ class DraftCompanion:
             row, data = self.records[name]
             missing = data.get("missing_relations", 0)
             reason = f"관계 {missing}개 자료 없음" if missing else (" · ".join(row[7]) or "조합 근거 확인")
-            card.configure(text=f"{idx+1:02d}   {self.app.format_display_name(name)}     {row[1]:.2f}\n{reason}", state="normal")
+            card.configure(text=f"{idx+1:02d}   {self.app.format_display_name(name)}   ·   추천 점수 {row[1]:.2f}\n{reason}", state="normal")
         self._show_selected()
 
     def select_card(self, index):

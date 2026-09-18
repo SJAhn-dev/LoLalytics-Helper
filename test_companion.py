@@ -29,6 +29,32 @@ def test_unsafe_layouts_are_rejected(client):
     assert panel_layout(Rect(0, 0, 1920, 1040), client) is None
 
 
+@pytest.mark.parametrize("work,client", [
+    (Rect(0, 0, 2556, 1058), Rect(638, 50, 1280, 720)),
+    (Rect(-2560, -100, 2560, 1400), Rect(-2080, 30, 1280, 720)),
+    (Rect(0, 0, 1920, 1040), Rect(180, 40, 1280, 720)),
+])
+def test_frame_joins_client_edges_and_dock_matches_both_wings(work, client):
+    layout = panel_layout(work, client)
+    left, right, dock = (layout[key] for key in ("allies", "enemies", "dock"))
+    assert left.width == right.width
+    assert left.right == client.x and right.x == client.right
+    assert left.y == right.y == client.y
+    assert left.bottom == right.bottom == client.bottom == dock.y
+    assert dock.x == left.x and dock.right == right.right
+    assert dock.height == 250
+    assert dock.width < work.width  # No monitor-wide bottom strip.
+
+
+@pytest.mark.parametrize("work", [Rect(0, 0, 1920, 1040), Rect(0, 0, 3440, 1400)])
+def test_default_layout_reserves_a_1280_by_720_client(work):
+    client = suggested_client_rect(work)
+    assert (client.width, client.height) == (1280, 720)
+    layout = panel_layout(work, client)
+    assert layout["dock"].width == 1728
+    assert layout["dock"].height == 250
+
+
 def test_bans_and_lane_changes_invalidate_signature():
     snapshot = {"allies": [{"championId": 1, "assignedPosition": "top"}],
                 "enemies": [], "allyBans": [], "enemyBans": []}
@@ -165,6 +191,48 @@ def test_full_list_toggle_and_slot_editor(gui_app):
     ui.toggle_list()
     assert ui.card_frame.winfo_manager() == "pack"
     assert not ui.list_frame.winfo_manager()
+
+
+def test_frame_minimize_hides_wings_and_restore_keeps_controls(gui_app):
+    ui = gui_app.draft_dashboard
+    gui_app.root.deiconify()
+    gui_app.root.update()
+    ui.minimize_button.invoke()
+    gui_app.root.update()
+    assert gui_app.root.state() == "iconic"
+    assert all(w.state() == "withdrawn" for w in ui.windows.values())
+    gui_app.root.deiconify()
+    gui_app.root.update()
+    assert gui_app.root.state() == "normal"
+    assert ui.close_button.winfo_ismapped()
+    assert gui_app.notebook.winfo_ismapped()
+
+
+def test_native_frame_outer_size_and_roster_fill(gui_app):
+    ui = gui_app.draft_dashboard
+    if not ui.native.available:
+        pytest.skip("Windows outer frame dimensions")
+    ui.follow.set(False)
+    gui_app.root.deiconify()
+    gui_app.root.update()
+    layout = panel_layout(Rect(0, 0, 1920, 1040), Rect(320, 35, 1280, 720))
+    ui._place_layout(layout)
+    gui_app.root.update()
+    for key, window in {"dock": gui_app.root, **ui.windows}.items():
+        hwnd = ui.native.user.GetAncestor(window.winfo_id(), 2)
+        outer = ui.native.w.RECT()
+        assert ui.native.user.GetWindowRect(hwnd, ui.native.c.byref(outer))
+        assert ui.native._rect(outer) == layout[key]
+    for slots in gui_app.banpick_slots.values():
+        heights = [s["frame"].winfo_height() for s in slots]
+        assert min(heights) > 90  # Five compact rows must not bunch at the top.
+        assert max(heights) - min(heights) <= 1
+        slots[0]["editor"].pack(fill="x")
+    gui_app.root.update()
+    for slots in gui_app.banpick_slots.values():
+        editor = slots[0]["editor"]
+        assert editor.winfo_ismapped()
+        assert editor.winfo_height() >= editor.winfo_reqheight()
 
 
 def test_connection_status_and_candidate_exclusion_target(gui_app):

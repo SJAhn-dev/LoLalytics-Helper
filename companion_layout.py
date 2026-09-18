@@ -31,8 +31,12 @@ class Rect:
                 and self.y < other.bottom and other.y < self.bottom)
 
 
-def panel_layout(work, client, gap=8, min_wing=170, min_dock=250):
-    """Return outer panel rectangles, or None when the client leaves no room."""
+CLIENT_WIDTH, CLIENT_HEIGHT = 1280, 720
+WING_WIDTH, DOCK_HEIGHT = 224, 250
+
+
+def panel_layout(work, client, gap=0, min_wing=170, min_dock=240):
+    """Fit a symmetric U-shaped frame to the client, never to the monitor width."""
     if client.width <= 0 or client.height < 300 or not work.contains(client):
         return None
     left = client.x - work.x - gap
@@ -40,20 +44,25 @@ def panel_layout(work, client, gap=8, min_wing=170, min_dock=250):
     bottom = work.bottom - client.bottom - gap
     if min(left, right) < min_wing or bottom < min_dock:
         return None
-    left, right = min(left, 340), min(right, 340)
+    wing = min(left, right, WING_WIDTH)
+    dock_left = client.x - gap - wing
     return {
-        "allies": Rect(client.x - gap - left, client.y, left, client.height),
-        "enemies": Rect(client.right + gap, client.y, right, client.height),
-        "dock": Rect(work.x, client.bottom + gap, work.width, bottom),
+        "allies": Rect(dock_left, client.y, wing, client.height),
+        "enemies": Rect(client.right + gap, client.y, wing, client.height),
+        "dock": Rect(dock_left, client.bottom + gap,
+                     client.width + 2 * (wing + gap), min(bottom, DOCK_HEIGHT)),
     }
 
 
 def suggested_client_rect(work):
     """Manual layout when League is closed; never resize the user's client."""
-    wing = max(178, min(300, work.width // 6))
-    width = max(1, work.width - 2 * (wing + 8))
-    height = min(round(width * 9 / 16), work.height - 286)
-    return Rect(work.x + wing + 8, work.y + 20, width, max(1, height))
+    margin = 16
+    width = max(1, min(CLIENT_WIDTH, work.width - 2 * (WING_WIDTH + margin),
+                       (work.height - DOCK_HEIGHT - 2 * margin) * 16 // 9))
+    height = max(1, round(width * 9 / 16))
+    return Rect(work.x + (work.width - width) // 2,
+                work.y + max(margin, (work.height - height - DOCK_HEIGHT) // 2),
+                width, height)
 
 
 def snapshot_signature(snapshot):
@@ -92,6 +101,8 @@ class WindowsClient:
             "GetWindowRect": ([w.HWND, c.POINTER(w.RECT)], w.BOOL),
             "GetClientRect": ([w.HWND, c.POINTER(w.RECT)], w.BOOL),
             "GetAncestor": ([w.HWND, w.UINT], w.HWND),
+            "GetWindowLongW": ([w.HWND, c.c_int], w.LONG),
+            "SetWindowLongW": ([w.HWND, c.c_int, w.LONG], w.LONG),
             "MonitorFromWindow": ([w.HWND, w.DWORD], w.HANDLE),
             "GetMonitorInfoW": ([w.HANDLE, c.c_void_p], w.BOOL),
             "SetWindowPos": ([w.HWND, w.HWND, c.c_int, c.c_int,
@@ -160,6 +171,18 @@ class WindowsClient:
         self.user.EnumWindows(visit, 0)
         return found[0] if found else None
 
+    def compact_chrome(self, window):
+        """Remove only our dock's native frame, keeping its taskbar/minimize behavior."""
+        if not self.available:
+            return
+        window.update_idletasks()
+        hwnd = self.user.GetAncestor(window.winfo_id(), 2)
+        style = self.user.GetWindowLongW(hwnd, -16)
+        compact = style & ~0x00C40000  # WS_CAPTION | WS_THICKFRAME
+        if style != compact:
+            self.user.SetWindowLongW(hwnd, -16, compact)
+            self.user.SetWindowPos(hwnd, None, 0, 0, 0, 0, 0x0037)
+
     def place(self, window, rect):
         """Account for native borders, and support negative monitor coordinates."""
         if not self.available:
@@ -176,7 +199,9 @@ class WindowsClient:
         window.geometry(f"{max(1, rect.width-border_w)}x{max(1, rect.height-border_h)}")
         window.update_idletasks()
         # Do not raise/activate a helper panel over the League window.
-        self.user.SetWindowPos(hwnd, None, rect.x, rect.y, 0, 0, 0x0015)
+        # Tk caches the removed caption dimensions on Windows. Set the outer
+        # size as well so the dock and borderless wings meet at exact pixels.
+        self.user.SetWindowPos(hwnd, None, rect.x, rect.y, rect.width, rect.height, 0x0014)
 
 
 def enable_dpi_awareness():

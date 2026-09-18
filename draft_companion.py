@@ -132,6 +132,7 @@ def create_team_column(app, parent, title, side):
         exclude.trace_add("write", lambda *_: app.update_banpick_recommendations())
         manual.trace_add("write", lambda *_: app.draft_dashboard.refresh_slots())
         slot["autocomplete"] = AutocompletePopup(entry, app.get_autocomplete_candidates,
+            display_formatter=app.format_display_name,
             on_select=lambda _value, s=slot: app.perform_banpick_search(s))
         slot["tooltip"] = ScoreTooltip(result_label, lambda s=slot: app._get_score_tooltip_text(s))
         app._update_slot_lane_cache(slot)
@@ -407,7 +408,7 @@ class DraftCompanion:
             row, data = self.records[name]
             missing = data.get("missing_relations", 0)
             reason = f"관계 {missing}개 자료 없음" if missing else (" · ".join(row[7]) or "조합 근거 확인")
-            card.configure(text=f"{idx+1:02d}   {name}     {row[1]:.2f}\n{reason}", state="normal")
+            card.configure(text=f"{idx+1:02d}   {self.app.format_display_name(name)}     {row[1]:.2f}\n{reason}", state="normal")
         self._show_selected()
 
     def select_card(self, index):
@@ -418,10 +419,17 @@ class DraftCompanion:
     def _select_tree(self, _event):
         selected = self.app.recommend_tree.selection()
         if selected:
-            name = self.app.recommend_tree.item(selected[0], "values")[0].removeprefix("⚠ ")
+            name = self._tree_record_name(selected[0])
             if name in self.records:
                 self.selected_name = name
                 self._show_selected()
+
+    def _tree_record_name(self, item):
+        if item in self.records:
+            return item
+        label = self.app.recommend_tree.item(item, "values")[0].removeprefix("⚠ ")
+        return next((name for name in self.records
+                     if self.app.format_display_name(name) == label), None)
 
     def _show_selected(self):
         for idx, name in enumerate(getattr(self, "card_names", [])):
@@ -433,17 +441,17 @@ class DraftCompanion:
             self.detail.set("내 라인과 조합을 입력하세요 · 조건에 맞는 추천이 없습니다")
         else:
             row, values = data
-            self.detail.set(f"{row[0]}  |  시너지 {row[2]:.2f}  ·  상성 {row[3]:.2f}  |  "
+            self.detail.set(f"{self.app.format_display_name(row[0])}  |  시너지 {row[2]:.2f}  ·  상성 {row[3]:.2f}  |  "
                             f"확인된 관계 {values.get('known_relations', 0)} / {values.get('expected_relations', 0)}")
             tree = self.app.recommend_tree
             for item in tree.get_children():
-                name = tree.item(item, "values")[0].removeprefix("⚠ ")
+                name = self._tree_record_name(item)
                 if name == self.selected_name:
                     if tree.selection() != (item,):
                         tree.selection_set(item)
                     break
         for side, field in (("allies", "synergy_relations"), ("enemies", "counter_relations")):
-            self.basis_labels[side].configure(text=(f"{self.selected_name} 기준 관계별 승률" if data else "하단에서 추천 후보를 선택하세요"))
+            self.basis_labels[side].configure(text=(f"{self.app.format_display_name(self.selected_name)} 기준 관계별 승률" if data else "하단에서 추천 후보를 선택하세요"))
             relations = data[1].get(field, {}) if data else {}
             for slot in self.app.banpick_slots[side]:
                 relation = relations.get(slot["index"])

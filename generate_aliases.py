@@ -1,12 +1,8 @@
 import json
-import os
 import re
 from pathlib import Path
 
 import requests
-import urllib3
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 BASE_DIR = Path(__file__).resolve().parent
 ALIAS_PATH = BASE_DIR / "champion_aliases.json"
@@ -20,7 +16,7 @@ SLUG_OVERRIDES = {
 
 
 def fetch_json(url: str) -> dict:
-    response = requests.get(url, timeout=15, verify=False)
+    response = requests.get(url, timeout=30)
     response.raise_for_status()
     return response.json()
 
@@ -65,29 +61,36 @@ def build_aliases() -> dict[str, list[str]]:
             existing = json.load(handle)
 
     alias_map: dict[str, set[str]] = {}
+    # Keep custom search aliases, merging accidental case-only duplicate keys.
+    for slug, aliases in existing.items():
+        if isinstance(aliases, list):
+            alias_map.setdefault(slug.lower(), set()).update(
+                alias for alias in aliases if isinstance(alias, str) and alias.strip())
+    display_names = {}
 
     for champion_id, info in english_data.items():
         slug = slugify(champion_id)
         english_name = info.get("name", "").strip()
         korean_name = korean_data.get(champion_id, {}).get("name", "").strip()
+        if not korean_name:
+            raise RuntimeError(f"Missing official Korean name for {champion_id}.")
+        display_names[slug] = korean_name
 
         alias_bucket = alias_map.setdefault(slug, set())
-        for alias in (slug, english_name, english_name.lower(), korean_name):
+        for alias in (slug, champion_id, english_name, english_name.lower(), korean_name):
             if not alias:
                 continue
             alias_bucket.add(alias)
             for variant in sanitize_alias(alias):
                 alias_bucket.add(variant)
 
-        for alias in existing.get(slug, []):
-            if isinstance(alias, str):
-                alias_bucket.add(alias)
-
-    for slug, aliases in existing.items():
-        if slug not in alias_map and isinstance(aliases, list):
-            alias_map[slug] = {alias for alias in aliases if isinstance(alias, str)}
-
-    return {slug: sorted(values, key=lambda s: (s.lower(), s)) for slug, values in sorted(alias_map.items())}
+    result = {}
+    for slug, values in sorted(alias_map.items()):
+        ordered = sorted(values, key=lambda s: (s.lower(), s))
+        official = display_names.get(slug)
+        # The first Korean entry is the official display name, including spacing.
+        result[slug] = [official] + [v for v in ordered if v != official] if official else ordered
+    return result
 
 
 def main() -> None:

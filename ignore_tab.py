@@ -48,6 +48,7 @@ class IgnoreTab:
         self.ignore_autocomplete = AutocompletePopup(
             self.ignore_entry,
             self.app.get_autocomplete_candidates,
+            display_formatter=self.app.format_display_name,
             on_select=lambda _value: None
         )
         self.refresh_ignore_listbox()

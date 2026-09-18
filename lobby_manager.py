@@ -343,7 +343,7 @@ def load_alias_tables():
 
         display_value = canonical_name.title()
         if isinstance(aliases, list) and aliases:
-            display_value = next((alias for alias in aliases if alias and alias[0].isascii()), display_value)
+            display_value = next((alias for alias in aliases if contains_hangul_syllable(alias)), display_value)
             for alias in aliases:
                 if alias:
                     autocomplete_values.add(alias.strip())
@@ -3110,7 +3110,9 @@ class ChampionScraperApp:
         recommendations = []
 
         for champ_name, components in scores.items():
-            if champ_name.lower() in selected_lowers:
+            candidate_canonical = self.resolve_champion_name(champ_name)
+            if (champ_name.lower() in selected_lowers
+                    or (candidate_canonical and candidate_canonical.lower() in selected_lowers)):
                 continue
             # 밴된 챔피언은 추천 목록에서 제외
             if self.is_champion_banned(champ_name):
@@ -3172,13 +3174,15 @@ class ChampionScraperApp:
 
         recommendations.sort(key=lambda item: item[1], reverse=True)
         for champ_name, total, synergy_score, counter_score, synergy_sources, counter_sources, has_low_sample, tags in recommendations[:20]:
-            display_name = f"{WARNING_ICON} {champ_name}" if has_low_sample else champ_name
+            localized_name = self.format_display_name(champ_name)
+            display_name = f"{WARNING_ICON} {localized_name}" if has_low_sample else localized_name
             synergy_label = " / ".join(synergy_sources) if synergy_sources else "-"
             counter_label = " / ".join(counter_sources) if counter_sources else "-"
             tag_label = ", ".join(tags) if tags else "-"
             tree.insert(
                 "",
                 "end",
+                iid=champ_name,
                 values=(
                     display_name,
                     tag_label,
@@ -3433,11 +3437,18 @@ class ChampionScraperApp:
         self.update_banpick_recommendations()
 
     def format_display_name(self, slug: str) -> str:
-        key = slug.lower().replace("_", "")
-        display = self.display_lookup.get(key)
+        name = str(slug or "").strip()
+        key = name.lower().replace("_", "")
+        canonical = getattr(self, "canonical_lookup", {}).get(key)
+        if canonical is None:
+            for variant in alias_variants(name, include_initials=False):
+                canonical = getattr(self, "alias_lookup", {}).get(variant)
+                if canonical is not None:
+                    break
+        display = getattr(self, "display_lookup", {}).get(canonical or key)
         if display:
             return display
-        return slug.replace("_", " ").title()
+        return name.replace("_", " ").title()
 
     def resolve_champion_name(self, query: str):
         allow_initials = not contains_hangul_syllable(query or "")

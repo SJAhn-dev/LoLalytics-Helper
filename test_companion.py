@@ -182,3 +182,40 @@ def test_connection_status_and_candidate_exclusion_target(gui_app):
     assert tree.selection() == (second,)
     gui_app.client_fetch_button.config(state="disabled")
     gui_app.client_fetch_button.config(state="normal")
+
+
+def test_korean_cards_and_tree_keep_the_same_candidate_identity(gui_app):
+    ui = gui_app.draft_dashboard
+    tree = gui_app.recommend_tree
+    tree.insert("", "end", iid="Jarvan IV", values=("자르반 4세", "", "104.2", "", ""))
+    tree.insert("", "end", iid="Nunu & Willump", values=("⚠ 누누와 윌럼프", "", "103.1", "", ""))
+    rows = [("Jarvan IV", 104.2, 52.8, 51.4, [], [], False, []),
+            ("Nunu & Willump", 103.1, 50.7, 52.4, [], [], True, [])]
+    ui.set_recommendations(rows)
+    assert "자르반 4세" in ui.cards[0].cget("text")
+    assert "누누와 윌럼프" in ui.cards[1].cget("text")
+    ui.cards[1].invoke()
+    assert tree.selection() == ("Nunu & Willump",)
+    assert "누누와 윌럼프" in ui.detail.get()
+    tree.selection_set("Jarvan IV")
+    ui._select_tree(None)
+    assert ui.selected_name == "Jarvan IV"
+    assert ui.basis_labels["allies"].cget("text").startswith("자르반 4세")
+    ui.set_recommendations(list(reversed(rows)))
+    assert ui.selected_name == "Jarvan IV"
+
+
+def test_localized_picked_champion_is_excluded_from_recommendations():
+    from test_korean_names import named_app
+    names = named_app()
+    app = recommendation_app()
+    app.resolve_champion_name = names.resolve_champion_name
+    app.format_display_name = names.format_display_name
+    picked = slot("nunu", "jungle")
+    picked["display_name"] = "누누와 윌럼프"
+    app.banpick_slots["allies"].append(picked)
+    app.banpick_slots["enemies"] = [slot("ahri", "middle", counter_dataset={"middle": {
+        "Nunu & Willump": {"win_rate": 45, "games": 12000, "pick_rate": 3}}})]
+    app.update_banpick_recommendations()
+    rows, _ = app.draft_dashboard.set_recommendations.call_args.args
+    assert rows == []

@@ -37,11 +37,12 @@ def resolve_resource_path(*path_parts: str) -> str:
     return candidates[0]
 
 class AutocompletePopup:
-    def __init__(self, entry_widget, values_provider, on_select=None, max_results=8):
+    def __init__(self, entry_widget, values_provider, on_select=None, max_results=8, display_formatter=None):
         self.entry = entry_widget
         self.values_provider = values_provider
         self.on_select = on_select
         self.max_results = max_results
+        self.display_formatter = display_formatter or (lambda value: value)
         self.popup = None
         self.listbox = None
         self.hide_job = None
@@ -128,11 +129,10 @@ class AutocompletePopup:
                 add_unique(word_matches, value)
                 continue
 
-            if len(prefix_matches) + len(word_matches) >= self.max_results:
-                break
-
         combined = prefix_matches + word_matches
-        return combined[:self.max_results]
+        # Search English names and nicknames, but show each official name once.
+        formatted = dict.fromkeys(self.display_formatter(value) for value in combined)
+        return list(formatted)[:self.max_results]
 
     def _ensure_popup(self):
         if self.popup and self.popup.winfo_exists():

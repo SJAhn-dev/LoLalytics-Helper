@@ -1,5 +1,6 @@
 import tkinter as tk
 import threading
+import time
 from tkinter import messagebox, ttk, filedialog
 import json
 import os
@@ -10,6 +11,9 @@ import copy
 import logging
 from pathlib import Path
 from collections import defaultdict
+from companion_layout import enable_dpi_awareness, snapshot_signature
+from draft_companion import DraftCompanion, HEXTECH_THEME
+from ui_assets import UIAssets
 from op_duos_tab import OpDuosTab
 from ignore_tab import IgnoreTab
 from counter_synergy_tab import CounterSynergyTab
@@ -17,6 +21,7 @@ from credits_tab import CreditsTab
 from weight_settings_tab import WeightSettingsTab, load_weight_settings
 from common import (
     resolve_resource_path,
+    resolve_writable_path,
     AutocompletePopup,
     ScoreTooltip,
     LANES,
@@ -30,17 +35,13 @@ from common import (
 try:
     import requests
     import urllib3
-    import threading
-    import time
 except ImportError:  # requests는 선택적 의존성
     requests = None
     urllib3 = None
-    threading = None
-    time = None
 
 ALIAS_FILE = resolve_resource_path("champion_aliases.json")
 IGNORED_CHAMPIONS_FILE = resolve_resource_path("ignored_champions.json")
-UI_SETTINGS_FILE = resolve_resource_path("ui_settings.json")
+UI_SETTINGS_FILE = resolve_writable_path("ui_settings.json")
 WEIGHT_SETTINGS_FILE = resolve_resource_path("weight_settings.json")
 DATA_DIR = Path(resolve_resource_path("data"))
 LOG_DIR = Path(resolve_resource_path("logs"))
@@ -133,7 +134,7 @@ THEME_DARK = {
     "score_low": "#F38BA8",      # Catppuccin Red
 }
 
-BANPICK_DEFAULT_LANES = ['jungle', 'bottom', 'support', 'middle', 'top']
+BANPICK_DEFAULT_LANES = list(LANES)
 BANPICK_MIN_GAMES_DEFAULT = 900
 BANPICK_PICK_RATE_OVERRIDE = 1.5
 BANPICK_HIGH_SAMPLE_THRESHOLD = 10000
@@ -344,7 +345,7 @@ def load_alias_tables():
 
         display_value = canonical_name.title()
         if isinstance(aliases, list) and aliases:
-            display_value = next((alias for alias in aliases if alias and alias[0].isascii()), display_value)
+            display_value = next((alias for alias in aliases if contains_hangul_syllable(alias)), display_value)
             for alias in aliases:
                 if alias:
                     autocomplete_values.add(alias.strip())
@@ -630,10 +631,7 @@ else:
                     
                     self._last_phase = current_phase or timer_phase
                     
-                    signature = (
-                        tuple(entry["championId"] for entry in snapshot.get("allies", [])),
-                        tuple(entry["championId"] for entry in snapshot.get("enemies", []))
-                    )
+                    signature = snapshot_signature(snapshot)
                     if signature != self._last_signature:
                         self._last_signature = signature
                         if self._callback:
@@ -642,6 +640,7 @@ else:
                     # 세션이 사라진 경우 (게임 종료 또는 픽창 종료)
                     if self._had_session:
                         self._had_session = False
+                        self._last_signature = None
                         self._snapshot_saved = False  # 세션 종료 시 스냅샷 저장 플래그 리셋
                         self._last_phase = None
                         self._first_pick_side = None
@@ -1103,103 +1102,76 @@ def diagnose_lcu_connection():
 class ChampionScraperApp:
     def __init__(self, root):
         self.root = root
-        self.root.title(f"TtimoTtabbong {APP_VERSION}")
+        self.root.title(f"LoLalytics Helper {APP_VERSION} — Draft Companion")
         try:
-            self.root.iconbitmap("icon.ico")
+            self.root.iconbitmap(resolve_resource_path("icon.ico"))
         except tk.TclError:
-            pass  # 아이콘 파일이 없거나 로드 실패 시 무시
-        self.root.state('zoomed')  # Start maximized
-        self.root.grid_rowconfigure(0, weight=1)
+            pass
+        self.root.geometry("1100x300")
+        self.root.minsize(760, 200)
+        self.root.grid_rowconfigure(1, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
-        self.notebook = ttk.Notebook(root)
-        self.notebook.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
-        
-        self.dashboard_tab = tk.Frame(self.notebook)
-        self.notebook.add(self.dashboard_tab, text="챔피언 추천")
+        self.ui_settings = self._load_ui_settings()
+        self.weight_settings = load_weight_settings()
+        self.current_theme = HEXTECH_THEME
+        self.assets = UIAssets(root)
+        self.ui_font = self.assets.family
         self.recommend_counter_cache = {}
-        
-        # 챔피언 데이터 캐시 및 사전 로딩
-        self.champion_data_cache = {}
-        threading.Thread(target=self.preload_all_champion_data, daemon=True).start()
-        
+        self.champion_data_cache = self.preload_all_champion_data(Path(resolve_resource_path("data")))
+        self._closing = False
         self._lane_swap_guard = False
-        self.paned_window = None  # Will be set in build_dashboard_tab
-        self.ui_settings = self._load_ui_settings()  # Load UI settings
-        self.weight_settings = load_weight_settings()  # Load weight settings
-        
-        # 테마 초기화
-        saved_theme = self.ui_settings.get("theme", "light")
-        self.current_theme = THEME_DARK if saved_theme == "dark" else THEME_LIGHT
-        
+        self.paned_window = None
         self.client_watcher = None
-        self.client_sync_supported = True
+        self.client_sync_supported = requests is not None
         self.client_sync_error = None
         self.last_client_snapshot = None
-        # 현재 게임에서 밴된 챔피언 (canonical/alias 기준, 모두 소문자)
-        self.banned_champions: set[str] = set()
-        # 팀별 밴 표시용 레이블 ({"allies": Label, "enemies": Label})
-        self.ban_labels: dict[str, tk.Label] = {}
-        
-        (
-            self.canonical_lookup,
-            self.alias_lookup,
-            self.display_lookup,
-            self.autocomplete_candidates
-        ) = load_alias_tables()
-
-    def preload_all_champion_data(self):
-        """
-        data 디렉토리의 모든 JSON 파일을 읽어 메모리에 캐싱합니다.
-        백그라운드 스레드에서 실행됩니다.
-        """
-        data_dir = resolve_resource_path("data")
-        if not os.path.exists(data_dir):
-            return
-            
-        try:
-            for filename in os.listdir(data_dir):
-                if not filename.endswith(".json"):
-                    continue
-                    
-                path = os.path.join(data_dir, filename)
-                try:
-                    with open(path, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                        self.champion_data_cache[filename] = data
-                except Exception as e:
-                    print(f"Failed to load {filename}: {e}")
-        except Exception as e:
-            print(f"Error during data preload: {e}")
-            
-        print(f"Preloaded {len(self.champion_data_cache)} champion data files.")
-
+        self.banned_champions = set()
+        self.ban_labels = {}
+        (self.canonical_lookup, self.alias_lookup, self.display_lookup,
+         self.autocomplete_candidates) = load_alias_tables()
         self.ignored_champions = self._initialize_ignored_champions()
-        
         try:
             self.client_watcher = LeagueClientWatcher()
         except RuntimeError as exc:
             self.client_sync_supported = False
             self.client_sync_error = str(exc)
-
-        initial_lcu_status = "연결 상태 미확인"
-        if requests is None:
-            initial_lcu_status = "requests 미설치로 LCU 점검 불가"
-        self.lcu_status_var = tk.StringVar(value=initial_lcu_status)
+        self.lcu_status_var = tk.StringVar(value=("연결 상태 미확인" if requests is not None
+                                                else "수동 모드 · requests 설치 시 연동 가능"))
         self.client_sync_var = tk.BooleanVar(value=True)
-
         self.apply_theme()
-        
+        self.notebook = ttk.Notebook(root)
+        self.notebook.grid(row=1, column=0, sticky="nsew", padx=1, pady=(0, 1))
+        self.dashboard_tab = tk.Frame(self.notebook)
+        self.notebook.add(self.dashboard_tab, text="밴픽")
         self.build_dashboard_tab()
-        
-        # Initialize other tabs
         self.counter_synergy_tab = CounterSynergyTab(self.notebook, self)
         self.op_duos_tab = OpDuosTab(self.notebook, self, DATA_DIR)
         self.ignore_tab = IgnoreTab(self.notebook, self)
         self.credits_tab = CreditsTab(self.notebook, self)
         self.notebook.add(self.credits_tab, text="고마운 분들")
-        
-        # Weight settings tab
         self.weight_settings_tab = WeightSettingsTab(self.notebook, self)
+        # Tk objects and their lifecycle stay on the main thread. Loading the
+        # small bundled dataset synchronously also avoids Tk finalizers running
+        # during garbage collection in a data-loading worker.
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
+
+    @staticmethod
+    def preload_all_champion_data(data_dir):
+        cache = {}
+        if data_dir.is_dir():
+            for path in data_dir.glob("*.json"):
+                try:
+                    cache[path.name] = json.loads(path.read_text(encoding="utf-8"))
+                except (OSError, ValueError) as exc:
+                    logging.warning("Could not preload %s: %s", path.name, exc)
+        return cache
+
+    def close(self):
+        self._closing = True
+        if self.client_watcher:
+            self.client_watcher.stop()
+        self.root.destroy()
+        self.assets.close()
 
     def apply_theme(self, theme=None):
         """현재 테마 또는 지정된 테마를 적용합니다."""
@@ -1221,9 +1193,9 @@ class ChampionScraperApp:
         button_pressed_bg = t["button_pressed_bg"]
         
         # 다크모드에서 비활성화 버튼 색상 조정
-        is_dark = t["name"] == "dark"
-        disabled_bg = "#45475A" if is_dark else "#E0E0E0"
-        disabled_fg = "#6C7086" if is_dark else "#5D4037"
+        is_dark = t["name"] in ("dark", "hextech")
+        disabled_bg = "#18232D" if is_dark else "#E0E0E0"
+        disabled_fg = "#A09B8C" if is_dark else "#5D4037"
         
         # Configure standard Tk widgets via option database
         self.root.option_add("*Background", bg_color)
@@ -1255,7 +1227,7 @@ class ChampionScraperApp:
         style = ttk.Style(self.root)
         style.theme_use('clam')  # Use clam as base for better color customization
         
-        style.configure(".", background=bg_color, foreground=fg_color, font=("Segoe UI", 9))
+        style.configure(".", background=bg_color, foreground=fg_color, font=(self.ui_font, -13))
         style.configure("TFrame", background=bg_color)
         style.configure("TLabel", background=bg_color, foreground=fg_color)
         style.configure("TButton", background=button_color, foreground=button_fg, borderwidth=1)
@@ -1263,8 +1235,14 @@ class ChampionScraperApp:
             background=[("pressed", button_pressed_bg), ("active", button_active_bg), ("disabled", disabled_bg)],
             foreground=[("pressed", button_fg), ("active", button_fg), ("disabled", disabled_fg)]
         )
-        style.configure("TNotebook", background=bg_color, tabposition='n')
-        style.configure("TNotebook.Tab", background=accent_color, foreground=fg_color, padding=[10, 2])
+        style.configure("TNotebook", background=bg_color, tabposition='nw', borderwidth=0,
+                        bordercolor="#785A28", lightcolor=bg_color, darkcolor=bg_color)
+        style.configure("TNotebook.Tab", background=accent_color, foreground=fg_color,
+                        bordercolor="#253139", lightcolor=accent_color, darkcolor=accent_color,
+                        padding=[16, 6])
+        style.configure("Vertical.TScrollbar", background=accent_color, troughcolor=bg_color,
+                        bordercolor=bg_color, arrowcolor=button_fg, lightcolor=accent_color,
+                        darkcolor=accent_color, width=10)
         style.map("TNotebook.Tab",
             background=[("selected", select_color)],
             foreground=[("selected", fg_color)]
@@ -1273,12 +1251,13 @@ class ChampionScraperApp:
             background=treeview_bg,
             foreground=fg_color,
             fieldbackground=treeview_bg,
-            borderwidth=0
+            borderwidth=0, bordercolor=accent_color, lightcolor=accent_color, darkcolor=accent_color
         )
         style.configure("Treeview.Heading", 
             background=treeview_heading_bg, 
             foreground=fg_color,
-            font=("Segoe UI", 9, "bold")
+            font=(self.ui_font, -12, "bold"), bordercolor=accent_color,
+            lightcolor=accent_color, darkcolor=accent_color
         )
         style.map("Treeview", background=[("selected", select_color)], foreground=[("selected", fg_color)])
         
@@ -1316,175 +1295,7 @@ class ChampionScraperApp:
 
 
     def build_dashboard_tab(self):
-        self.banpick_slots = {"allies": [], "enemies": []}
-        self.my_lane_var = tk.StringVar(value="")
-        self.my_lane_var.trace_add("write", lambda *_: self.update_banpick_recommendations())
-        lcu_frame = tk.LabelFrame(self.dashboard_tab, text="클라이언트 연결 상태")
-        lcu_frame.pack(fill="x", padx=10, pady=(0, 5))
-        tk.Label(
-            lcu_frame,
-            textvariable=self.lcu_status_var,
-            anchor="w"
-        ).pack(side="left", padx=(8, 10))
-        self.lcu_check_button = tk.Button(
-            lcu_frame,
-            text="연결",
-            command=self.on_lcu_check_clicked,
-            state="normal" if requests is not None else "disabled"
-        )
-        self.lcu_check_button.pack(side="left")
-        
-        # 자동 동기화 및 수동 버튼 프레임
-        sync_frame = tk.Frame(lcu_frame)
-        sync_frame.pack(side="left", padx=(10, 0))
-        self.client_sync_checkbox = tk.Checkbutton(
-            sync_frame,
-            text="자동 동기화",
-            variable=self.client_sync_var,
-            command=self.on_client_sync_toggle,
-            state="disabled" # 연결 점검 성공 후 활성화
-        )
-        self.client_sync_checkbox.pack(side="left")
-        
-        self.client_fetch_button = tk.Button(
-            sync_frame,
-            text="수동 불러오기",
-            command=self.manual_client_import,
-            state="disabled" # 연결 점검 성공 후 활성화
-        )
-        self.client_fetch_button.pack(side="left", padx=(5, 0))
-
-        self.load_snapshot_button = tk.Button(
-            sync_frame,
-            text="스냅샷 불러오기",
-            command=self.load_snapshot
-        )
-        self.load_snapshot_button.pack(side="left", padx=(5, 0))
-        
-        # 테마 토글 버튼
-        is_dark = self.current_theme["name"] == "dark"
-        theme_text = "☀️ 라이트" if is_dark else "🌙 다크"
-        self.theme_toggle_button = tk.Button(
-            lcu_frame,
-            text=theme_text,
-            command=self.toggle_theme,
-            width=10
-        )
-        self.theme_toggle_button.pack(side="right", padx=(5, 8))
-        
-        # My Lane selection frame
-        my_lane_frame = tk.LabelFrame(self.dashboard_tab, text="나의 라인")
-        my_lane_frame.pack(fill="x", padx=10, pady=(5, 5))
-        
-        lane_names = [
-            ("top", "탑"),
-            ("jungle", "정글"),
-            ("middle", "미드"),
-            ("bottom", "바텀"),
-            ("support", "서포터")
-        ]
-        
-        for lane_value, lane_label in lane_names:
-            tk.Radiobutton(
-                my_lane_frame,
-                text=lane_label,
-                variable=self.my_lane_var,
-                value=lane_value,
-                indicatoron=0,
-                width=8
-            ).pack(side="left", padx=5, pady=5)
-        
-        # Clear selection button
-        tk.Button(
-            my_lane_frame,
-            text="선택 해제",
-            command=lambda: self.my_lane_var.set("")
-        ).pack(side="left", padx=10)
-        
-        # Create PanedWindow for resizable layout
-        self.paned_window = tk.PanedWindow(self.dashboard_tab, orient=tk.VERTICAL, sashrelief=tk.RAISED, sashwidth=5)
-        self.paned_window.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        # Top pane: slots container
-        top_pane = tk.Frame(self.paned_window)
-        self.paned_window.add(top_pane, minsize=200)
-        
-        container = tk.Frame(top_pane)
-        container.pack(fill="both", expand=True)
-        container.columnconfigure(0, weight=1)
-        container.columnconfigure(1, weight=1)
-
-        tk.Button(
-            top_pane,
-            text="대시보드 초기화",
-            command=self.reset_dashboard_tab
-        ).pack(anchor="ne", padx=0, pady=(5, 0))
-
-        left_column, left_total_label, left_ban_label = self._create_banpick_column(container, "우리팀", "allies")
-        left_column.grid(row=0, column=0, sticky="nsw", padx=(0, 5))
-        
-        right_column, right_total_label, right_ban_label = self._create_banpick_column(container, "상대팀", "enemies")
-        right_column.grid(row=0, column=1, sticky="nse", padx=(5, 0))
-        
-        self.team_total_labels = {
-            "allies": left_total_label,
-            "enemies": right_total_label
-        }
-
-        # 팀별 밴 챔피언 레이블 참조 저장
-        self.ban_labels = {
-            "allies": left_ban_label,
-            "enemies": right_ban_label,
-        }
-
-        # Bottom pane: recommendations
-        recommend_frame = tk.LabelFrame(self.paned_window, text="추천 챔피언")
-        self.paned_window.add(recommend_frame, minsize=150)
-        
-        # Restore saved sash position after a delay to ensure window is rendered
-        if "paned_sash_percentage" in self.ui_settings:
-            self.root.after(500, lambda: self._restore_sash_position())
-        
-        # Bind events to save position when dragging ends
-        self.paned_window.bind("<ButtonRelease-1>", self._on_paned_window_moved)
-
-        filter_frame = tk.Frame(recommend_frame)
-        filter_frame.pack(fill="x", padx=5, pady=(5, 0))
-        tk.Label(filter_frame, text="최소 게임 수").pack(side="left")
-        self.recommend_min_games_entry = tk.Entry(filter_frame, width=6)
-        self.recommend_min_games_entry.insert(0, str(BANPICK_MIN_GAMES_DEFAULT))
-        self.recommend_min_games_entry.pack(side="left", padx=(4, 0))
-        self.recommend_min_games_entry.bind("<KeyRelease>", lambda _e: self.update_banpick_recommendations())
-        self.recommend_min_games_entry.bind("<FocusOut>", lambda _e: self.update_banpick_recommendations())
-
-        tk.Label(filter_frame, text="최소 픽률").pack(side="left", padx=(10, 0))
-        self.recommend_pick_rate_entry = tk.Entry(filter_frame, width=6)
-        self.recommend_pick_rate_entry.insert(0, str(BANPICK_PICK_RATE_OVERRIDE))
-        self.recommend_pick_rate_entry.pack(side="left", padx=(4, 0))
-        self.recommend_pick_rate_entry.bind("<KeyRelease>", lambda _e: self.update_banpick_recommendations())
-        self.recommend_pick_rate_entry.bind("<FocusOut>", lambda _e: self.update_banpick_recommendations())
-
-        columns = ("챔피언", "태그", "최종 점수", "시너지", "카운터")
-        self.recommend_tree = ttk.Treeview(recommend_frame, columns=columns, show="headings", height=8)
-        for col in columns:
-            self.recommend_tree.heading(col, text=col)
-            self.recommend_tree.column(col, anchor="center")
-        self.recommend_tree.column("챔피언", anchor="w", width=100)
-        self.recommend_tree.column("태그", anchor="w", width=50)
-        self.recommend_tree.column("최종 점수", width=10)
-        self.recommend_tree.column("시너지", width=500)
-        self.recommend_tree.column("카운터", width=500)
-        scroll = tk.Scrollbar(recommend_frame, orient="vertical", command=self.recommend_tree.yview)
-        scroll.pack(side="right", fill="y")
-        self.recommend_tree.configure(yscrollcommand=scroll.set)
-        self.recommend_tree.pack(fill="both", expand=True)
-        action_frame = tk.Frame(recommend_frame)
-        action_frame.pack(fill="x", padx=5, pady=(5, 5))
-        tk.Button(
-            action_frame,
-            text="선택 챔피언 제외",
-            command=self.ignore_selected_recommendations
-        ).pack(side="right")
+        self.draft_dashboard = DraftCompanion(self)
 
     def manual_client_import(self):
         if not self.client_sync_supported or not self.client_watcher:
@@ -1717,114 +1528,6 @@ class ChampionScraperApp:
         if self.ignore_tab:
             self.ignore_tab.refresh_ignore_listbox()
 
-    def _create_banpick_column(self, parent, title, side_key):
-        column = tk.LabelFrame(parent, text=title)
-        for idx in range(5):
-            slot_frame = tk.Frame(column, bd=1, relief="groove", padx=6, pady=6)
-            slot_frame.pack(fill="x", pady=4)
-            
-            # 슬롯 프레임의 컬럼 가중치 설정 (가로 크기 최적화)
-            slot_frame.grid_columnconfigure(0, weight=1)  # entry 영역 확장
-            slot_frame.grid_columnconfigure(2, weight=0)  # lane_box 영역 (고정 크기)
-            slot_frame.grid_columnconfigure(4, weight=0)  # search_button 영역 (고정 크기)
-
-            tk.Label(slot_frame, text=f"슬롯 {idx + 1}", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="w")
-            
-            # Manual Checkbox
-            manual_var = tk.BooleanVar(value=False)
-            manual_check = tk.Checkbutton(
-                slot_frame,
-                text="수동",
-                variable=manual_var
-            )
-            manual_check.grid(row=0, column=1, padx=(10, 0), sticky="e")
-
-            # Exclude Checkbox
-            exclude_var = tk.BooleanVar(value=False)
-            exclude_var.trace_add("write", lambda *args: (self.update_banpick_recommendations(), self.update_team_total_scores()))
-            exclude_check = tk.Checkbutton(
-                slot_frame,
-                text="데이터 제외",
-                variable=exclude_var
-            )
-            exclude_check.grid(row=0, column=2, padx=(2, 0), sticky="e")
-
-            clear_button = tk.Button(slot_frame, text="데이터 제거", width=8)
-            clear_button.grid(row=0, column=3, padx=(6, 0), sticky="e")
-
-            entry = tk.Entry(slot_frame, width=11)
-            entry.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(4, 2))
-
-            lane_box = ttk.Combobox(slot_frame, values=LANES, state="readonly", width=9)
-            lane_box.grid(row=1, column=2, padx=(6, 0), pady=(4, 2), sticky="w")
-            if idx < len(BANPICK_DEFAULT_LANES):
-                lane_box.set(BANPICK_DEFAULT_LANES[idx])
-            else:
-                lane_box.set("라인 선택")
-
-            search_button = tk.Button(slot_frame, text="검색", width=5)
-            search_button.grid(row=1, column=3, padx=(6, 0), sticky="e")
-
-            result_var = tk.StringVar(value="검색 결과 없음")
-            result_label = tk.Label(slot_frame, textvariable=result_var, anchor="w")
-            result_label.grid(row=2, column=0, columnspan=5, sticky="ew", pady=(6, 0))
-
-            slot = {
-                "side": side_key,
-                "index": idx,
-                "entry": entry,
-                "lane": lane_box,
-                "button": search_button,
-                "clear_button": clear_button,
-                "result_var": result_var,
-                "result_label": result_label,  # 툴팁용
-                "exclude_var": exclude_var,
-                "manual_var": manual_var,
-                "display_name": None,
-                "canonical_name": None,
-                "selected_lane": None,
-                "synergy_dataset": None,
-                "counter_dataset": None,
-                "last_lane_value": None,
-                "last_lane": None,
-                "score_details": None  # 점수 계산 상세 정보
-            }
-
-            search_button.configure(command=lambda s=slot: self.perform_banpick_search(s))
-            entry.bind("<Return>", lambda event, s=slot: self.perform_banpick_search(s))
-            lane_box.bind("<<ComboboxSelected>>", lambda _event, s=slot: self.on_banpick_lane_changed(s))
-            clear_button.configure(command=lambda s=slot: self.clear_banpick_slot(s))
-
-            slot["autocomplete"] = AutocompletePopup(
-                entry,
-                self.get_autocomplete_candidates,
-                on_select=lambda _value, s=slot: self.perform_banpick_search(s, auto_trigger=False)
-            )
-            
-            # 점수 상세 정보 툴팁 추가
-            slot["tooltip"] = ScoreTooltip(
-                result_label,
-                lambda s=slot: self._get_score_tooltip_text(s)
-            )
-
-            self._update_slot_lane_cache(slot)
-            self.banpick_slots[side_key].append(slot)
-
-        # 밴 챔피언 표시 레이블 (각 팀 컬럼 상단)
-        ban_label = tk.Label(
-            column,
-            text="밴: -",
-            anchor="w",
-        )
-        ban_label.pack(fill="x", pady=(10, 2))
-
-        # 조합 점수 레이블을 컬럼 내부 하단에 추가
-        default_color = self.current_theme.get("score_default", "blue")
-        total_label = tk.Label(column, text="조합 점수: 0.00", font=("Segoe UI", 10, "bold"), fg=default_color)
-        total_label.pack(fill="x", pady=(0, 5))
-
-        return column, total_label, ban_label
-
     def manual_client_import(self):
         if not self.client_sync_supported or not self.client_watcher:
             if self.client_sync_error:
@@ -1935,8 +1638,9 @@ class ChampionScraperApp:
         changed |= self._populate_side_from_client("allies", allies)
         changed |= self._populate_side_from_client("enemies", enemies)
 
-        # 밴 정보 업데이트
+        previous_bans = set(self.banned_champions)
         self._update_banned_champions_from_snapshot(snapshot)
+        changed |= previous_bans != self.banned_champions
 
         if changed:
             self.update_banpick_recommendations()
@@ -2276,7 +1980,13 @@ class ChampionScraperApp:
                     if lane_value in LANES:
                         self.my_lane_var.set(lane_value)
         
-        if slot_canonical and normalized and slot_canonical.lower() == normalized:
+        requested_lane = (entry.get("assignedPosition") or "").lower()
+        if requested_lane == "utility":
+            requested_lane = "support"
+        fixed_lane = slot.get("manual_var") and slot["manual_var"].get()
+        current_lane = slot["lane"].get().lower() if slot.get("lane") else ""
+        if (slot_canonical and normalized and slot_canonical.lower() == normalized
+                and (fixed_lane or requested_lane not in LANES or requested_lane == current_lane)):
             slot["client_last_champion"] = normalized
             return False
         
@@ -2362,6 +2072,8 @@ class ChampionScraperApp:
         return True
 
     def _set_client_status(self, message):
+        if hasattr(self, "lcu_status_var"):
+            self.lcu_status_var.set(message)
         if hasattr(self, "client_status_var"):
             self.client_status_var.set(message)
 
@@ -2643,15 +2355,15 @@ class ChampionScraperApp:
         # 점수에 따른 이모지와 색상 결정
         if score > 102:
             emoji = "🟢"
-            color = "#2E7D32"  # Green
+            color = self.current_theme["score_high"]
         elif score >= 98:
             emoji = "🟡"
-            color = "#F57F17"  # Yellow/Orange
+            color = self.current_theme["score_medium"]
         else:
             emoji = "🔴"
-            color = "#C62828"  # Red
+            color = self.current_theme["score_low"]
         
-        result_var.set(f"{emoji} {display_name} ({selected_lane}) score: {score:.2f}")
+        result_var.set(f"조합 점수 {score:.2f}")
         if result_label:
             result_label.config(fg=color)
     
@@ -2660,6 +2372,9 @@ class ChampionScraperApp:
         for side_key in ["allies", "enemies"]:
             for slot in self.banpick_slots.get(side_key, []):
                 self._update_slot_score_display(slot)
+        dashboard = getattr(self, "draft_dashboard", None)
+        if dashboard:
+            dashboard.refresh_slots()
 
     def _check_champion_data_exists(self, champion_name, lane):
         """
@@ -3077,6 +2792,8 @@ class ChampionScraperApp:
 
         my_lane = self.my_lane_var.get()
         if not my_lane or my_lane not in LANES:
+            if getattr(self, "draft_dashboard", None):
+                self.draft_dashboard.set_recommendations([])
             return
 
         # Find the slot in allies team that matches my lane
@@ -3088,8 +2805,10 @@ class ChampionScraperApp:
                 break
         
         if not target_slot:
+            if getattr(self, "draft_dashboard", None):
+                self.draft_dashboard.set_recommendations([])
             return
-        
+
         # My lane is always in the allies team
         side_key = "allies"
         target_lane = my_lane
@@ -3112,6 +2831,8 @@ class ChampionScraperApp:
                     "counter_weight_sum": 0.0,  # 가중치 합 (정규화용)
                     "synergy_sources": [],
                     "counter_sources": [],
+                    "synergy_relations": {},
+                    "counter_relations": {},
                     "has_low_sample": False,
                     "has_low_pick_gap": False, # deprecated but kept for compatibility
                     "tags": [],
@@ -3163,6 +2884,8 @@ class ChampionScraperApp:
 
         # Synergy contributions from same side
         for friend_idx, friend in enumerate(self.banpick_slots.get(side_key, [])):
+            if friend is target_slot:
+                continue
             if friend.get("exclude_var") and friend["exclude_var"].get():
                 continue
             dataset = friend.get("synergy_dataset")
@@ -3238,6 +2961,7 @@ class ChampionScraperApp:
                 components["synergy_sum"] += value * weight
                 components["synergy_weight_sum"] += weight
                 components["synergy_slots_with_data"].add(friend_idx)
+                components["synergy_relations"][friend_idx] = {"win_rate": value, "games": games}
                 if low_sample:
                     components["has_low_sample"] = True
                     append_tag(components, RECOMMEND_LOW_SAMPLE_TAG)
@@ -3343,6 +3067,7 @@ class ChampionScraperApp:
                 components["counter_sum"] += value * weight
                 components["counter_weight_sum"] += weight
                 components["counter_slots_with_data"].add(enemy_idx)
+                components["counter_relations"][enemy_idx] = {"win_rate": value, "games": games}
                 if low_sample:
                     components["has_low_sample"] = True
                     append_tag(components, RECOMMEND_LOW_SAMPLE_TAG)
@@ -3397,7 +3122,9 @@ class ChampionScraperApp:
         recommendations = []
 
         for champ_name, components in scores.items():
-            if champ_name.lower() in selected_lowers:
+            candidate_canonical = self.resolve_champion_name(champ_name)
+            if (champ_name.lower() in selected_lowers
+                    or (candidate_canonical and candidate_canonical.lower() in selected_lowers)):
                 continue
             # 밴된 챔피언은 추천 목록에서 제외
             if self.is_champion_banned(champ_name):
@@ -3411,6 +3138,20 @@ class ChampionScraperApp:
             if not self._check_champion_data_exists(champ_name, target_lane):
                 continue
 
+            # Coverage counts include picked champions even when their data is absent.
+            friends = [s for s in self.banpick_slots["allies"] if s is not target_slot
+                       and s.get("canonical_name") and not (s.get("exclude_var") and s["exclude_var"].get())]
+            enemies = [s for s in self.banpick_slots["enemies"] if s.get("canonical_name")
+                       and not (s.get("exclude_var") and s["exclude_var"].get())]
+            expected = len(friends) + len(enemies)
+            known = len(components["synergy_slots_with_data"]) + len(components["counter_slots_with_data"])
+            components.update(expected_relations=expected, known_relations=known,
+                              missing_relations=max(0, expected-known))
+            if known < expected:
+                components["has_low_sample"] = True
+                components["all_high_sample"] = False
+                append_tag(components, RECOMMEND_LOW_SAMPLE_TAG)
+
             # 가중치 합으로 나눠서 정규화 (라인 간 비교 가능하게)
             synergy_score = (
                 components["synergy_sum"] / components["synergy_weight_sum"]
@@ -3423,7 +3164,8 @@ class ChampionScraperApp:
             total = synergy_score + counter_score
             if total == 0:
                 continue
-            if components["counter_weight_sum"] > 0 and components["all_counter_under_50"]:
+            if (components["counter_weight_sum"] > 0 and components["all_counter_under_50"]
+                    and len(components["counter_slots_with_data"]) == len(enemies)):
                 append_tag(components, RECOMMEND_FULL_COUNTER_TAG)
             if components["all_high_sample"] and (components["synergy_weight_sum"] > 0 or components["counter_weight_sum"] > 0):
                 append_tag(components, RECOMMEND_HIGH_SAMPLE_TAG)
@@ -3444,13 +3186,15 @@ class ChampionScraperApp:
 
         recommendations.sort(key=lambda item: item[1], reverse=True)
         for champ_name, total, synergy_score, counter_score, synergy_sources, counter_sources, has_low_sample, tags in recommendations[:20]:
-            display_name = f"{WARNING_ICON} {champ_name}" if has_low_sample else champ_name
+            localized_name = self.format_display_name(champ_name)
+            display_name = f"{WARNING_ICON} {localized_name}" if has_low_sample else localized_name
             synergy_label = " / ".join(synergy_sources) if synergy_sources else "-"
             counter_label = " / ".join(counter_sources) if counter_sources else "-"
             tag_label = ", ".join(tags) if tags else "-"
             tree.insert(
                 "",
                 "end",
+                iid=champ_name,
                 values=(
                     display_name,
                     tag_label,
@@ -3460,6 +3204,8 @@ class ChampionScraperApp:
                 )
             )
         
+        if getattr(self, "draft_dashboard", None):
+            self.draft_dashboard.set_recommendations(recommendations, scores)
         # 총 조합 점수 업데이트
         self.update_team_total_scores()
         # 모든 슬롯의 점수 표시 업데이트
@@ -3703,11 +3449,18 @@ class ChampionScraperApp:
         self.update_banpick_recommendations()
 
     def format_display_name(self, slug: str) -> str:
-        key = slug.lower().replace("_", "")
-        display = self.display_lookup.get(key)
+        name = str(slug or "").strip()
+        key = name.lower().replace("_", "")
+        canonical = getattr(self, "canonical_lookup", {}).get(key)
+        if canonical is None:
+            for variant in alias_variants(name, include_initials=False):
+                canonical = getattr(self, "alias_lookup", {}).get(variant)
+                if canonical is not None:
+                    break
+        display = getattr(self, "display_lookup", {}).get(canonical or key)
         if display:
             return display
-        return slug.replace("_", " ").title()
+        return name.replace("_", " ").title()
 
     def resolve_champion_name(self, query: str):
         allow_initials = not contains_hangul_syllable(query or "")
@@ -3887,9 +3640,11 @@ class ChampionScraperApp:
     def _load_ui_settings(self):
         """Load UI settings from file"""
         try:
-            if os.path.exists(UI_SETTINGS_FILE):
-                with open(UI_SETTINGS_FILE, "r", encoding="utf-8") as f:
-                    return json.load(f)
+            path = UI_SETTINGS_FILE if os.path.exists(UI_SETTINGS_FILE) else resolve_resource_path('ui_settings.json')
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    value = json.load(f)
+                    return value if isinstance(value, dict) else {}
         except Exception:
             pass
         return {}
@@ -3897,10 +3652,13 @@ class ChampionScraperApp:
     def _save_ui_settings(self):
         """Save UI settings to file"""
         try:
-            with open(UI_SETTINGS_FILE, "w", encoding="utf-8") as f:
+            temporary = UI_SETTINGS_FILE + '.tmp'
+            with open(temporary, "w", encoding="utf-8") as f:
                 json.dump(self.ui_settings, f, indent=2)
-        except Exception:
-            pass
+            os.replace(temporary, UI_SETTINGS_FILE)
+            return True
+        except OSError:
+            return False
     
     def _restore_sash_position(self):
         """Restore PanedWindow sash position from saved settings"""
@@ -3940,6 +3698,7 @@ class ChampionScraperApp:
 
 
 if __name__ == "__main__":
+    enable_dpi_awareness()
     root = tk.Tk()
     app = ChampionScraperApp(root)
     root.mainloop()

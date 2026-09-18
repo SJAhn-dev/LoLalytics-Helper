@@ -67,6 +67,7 @@ class CounterSynergyTab:
         self.counter_autocomplete = AutocompletePopup(
             self.name_entry,
             self.app.get_autocomplete_candidates,
+            display_formatter=self.app.format_display_name,
             on_select=lambda _value: self.on_autocomplete_selection("counter")
         )
 
@@ -162,6 +163,7 @@ class CounterSynergyTab:
         self.synergy_autocomplete = AutocompletePopup(
             self.ally_name_entry,
             self.app.get_autocomplete_candidates,
+            display_formatter=self.app.format_display_name,
             on_select=lambda _value: self.on_autocomplete_selection("synergy")
         )
 
@@ -529,7 +531,8 @@ class CounterSynergyTab:
             for name, details in sorted(data_dict.items(), key=lambda item: float(item[1].get('win_rate_diff', 0.0)), reverse=False):
                 games = self.app.parse_int(details.get("games"))
                 is_low = games < threshold
-                display_name = f"{WARNING_ICON} {name}" if is_low else name
+                localized_name = self.app.format_display_name(name)
+                display_name = f"{WARNING_ICON} {localized_name}" if is_low else localized_name
                 tag = "low_games" if is_low else "normal_games"
                 tree.insert("", "end", values=(
                     display_name,
@@ -553,7 +556,8 @@ class CounterSynergyTab:
             for name, details in sorted_entries:
                 games = self.app.parse_int(details.get("games"))
                 is_low = games < threshold
-                display_name = f"{WARNING_ICON} {name}" if is_low else name
+                localized_name = self.app.format_display_name(name)
+                display_name = f"{WARNING_ICON} {localized_name}" if is_low else localized_name
                 tag = "low_games" if is_low else "normal_games"
                 tree.insert("", "end", values=(
                     display_name,

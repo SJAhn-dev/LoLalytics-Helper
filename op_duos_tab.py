@@ -184,7 +184,7 @@ class OpDuosTab:
                     continue
 
                 highlights.append({
-                    "duo": f"{my_champ_name} + {partner_name}",
+                    "duo": f"{my_champ_name} + {self.app.format_display_name(partner_name)}",
                     "win": win_rate,
                     "pick": pick_rate,
                     "games": games

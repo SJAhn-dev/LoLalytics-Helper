@@ -1,899 +1,921 @@
 {
-  "Zaahen": [
-    "Zaahen",
-    "zaahen",
-    "자헨"
-  ],
   "aatrox": [
+    "아트록스",
     "Aatrox",
-    "aatrox",
-    "아트록스"
+    "aatrox"
   ],
   "ahri": [
+    "아리",
     "Ahri",
-    "ahri",
-    "아리"
+    "ahri"
   ],
   "akali": [
+    "아칼리",
     "Akali",
-    "akali",
-    "아칼리"
+    "akali"
   ],
   "akshan": [
+    "아크샨",
     "Akshan",
-    "akshan",
-    "아크샨"
+    "akshan"
   ],
   "alistar": [
+    "알리스타",
     "Alistar",
-    "alistar",
-    "알리스타"
+    "alistar"
   ],
   "ambessa": [
+    "암베사",
     "Ambessa",
-    "ambessa",
-    "암베사"
+    "ambessa"
   ],
   "amumu": [
+    "아무무",
     "Amumu",
-    "amumu",
-    "아무무"
+    "amumu"
   ],
   "anivia": [
+    "애니비아",
     "Anivia",
-    "anivia",
-    "애니비아"
+    "anivia"
   ],
   "annie": [
+    "애니",
     "Annie",
-    "annie",
-    "애니"
+    "annie"
   ],
   "aphelios": [
+    "아펠리오스",
     "Aphelios",
-    "aphelios",
-    "아펠리오스"
+    "aphelios"
   ],
   "ashe": [
+    "애쉬",
     "Ashe",
-    "ashe",
-    "애쉬"
+    "ashe"
   ],
   "aurelionsol": [
+    "아우렐리온 솔",
     "Aurelion Sol",
     "aurelion sol",
+    "AurelionSol",
     "aurelionsol",
-    "아우렐리온 솔",
     "아우렐리온솔"
   ],
   "aurora": [
+    "오로라",
     "Aurora",
-    "aurora",
-    "오로라"
+    "aurora"
   ],
   "azir": [
+    "아지르",
     "Azir",
-    "azir",
-    "아지르"
+    "azir"
   ],
   "bard": [
+    "바드",
     "Bard",
-    "bard",
-    "바드"
+    "bard"
   ],
   "belveth": [
+    "벨베스",
     "Bel'Veth",
     "bel'veth",
-    "belveth",
-    "벨베스"
+    "Belveth",
+    "belveth"
   ],
   "blitzcrank": [
+    "블리츠크랭크",
     "Blitzcrank",
-    "blitzcrank",
-    "블리츠크랭크"
+    "blitzcrank"
   ],
   "brand": [
+    "브랜드",
     "Brand",
-    "brand",
-    "브랜드"
+    "brand"
   ],
   "braum": [
+    "브라움",
     "Braum",
-    "braum",
-    "브라움"
+    "braum"
   ],
   "briar": [
+    "브라이어",
     "Briar",
-    "briar",
-    "브라이어"
+    "briar"
   ],
   "caitlyn": [
+    "케이틀린",
     "Caitlyn",
-    "caitlyn",
-    "케이틀린"
+    "caitlyn"
   ],
   "camille": [
+    "카밀",
     "Camille",
-    "camille",
-    "카밀"
+    "camille"
   ],
   "cassiopeia": [
+    "카시오페아",
     "Cassiopeia",
-    "cassiopeia",
-    "카시오페아"
+    "cassiopeia"
   ],
   "chogath": [
+    "초가스",
     "Cho'Gath",
     "cho'gath",
-    "chogath",
-    "초가스"
+    "Chogath",
+    "chogath"
   ],
   "corki": [
+    "코르키",
     "Corki",
-    "corki",
-    "코르키"
+    "corki"
   ],
   "darius": [
+    "다리우스",
     "Darius",
-    "darius",
-    "다리우스"
+    "darius"
   ],
   "diana": [
+    "다이애나",
     "Diana",
-    "diana",
-    "다이애나"
+    "diana"
   ],
   "draven": [
+    "드레이븐",
     "Draven",
-    "draven",
-    "드레이븐"
+    "draven"
   ],
   "drmundo": [
+    "문도 박사",
     "Dr. Mundo",
     "dr. mundo",
+    "DrMundo",
     "drmundo",
-    "문도 박사",
     "문도박사"
   ],
   "ekko": [
+    "에코",
     "Ekko",
-    "ekko",
-    "에코"
+    "ekko"
   ],
   "elise": [
+    "엘리스",
     "Elise",
-    "elise",
-    "엘리스"
+    "elise"
   ],
   "evelynn": [
+    "이블린",
     "Evelynn",
-    "evelynn",
-    "이블린"
+    "evelynn"
   ],
   "ezreal": [
+    "이즈리얼",
     "Ezreal",
-    "ezreal",
-    "이즈리얼"
+    "ezreal"
   ],
   "fiddlesticks": [
+    "피들스틱",
     "Fiddlesticks",
-    "fiddlesticks",
-    "피들스틱"
+    "fiddlesticks"
   ],
   "fiora": [
+    "피오라",
     "Fiora",
-    "fiora",
-    "피오라"
+    "fiora"
   ],
   "fizz": [
+    "피즈",
     "Fizz",
-    "fizz",
-    "피즈"
+    "fizz"
   ],
   "galio": [
+    "갈리오",
     "Galio",
-    "galio",
-    "갈리오"
+    "galio"
   ],
   "gangplank": [
+    "갱플랭크",
     "Gangplank",
-    "gangplank",
-    "갱플랭크"
+    "gangplank"
   ],
   "garen": [
+    "가렌",
     "Garen",
-    "garen",
-    "가렌"
+    "garen"
   ],
   "gnar": [
+    "나르",
     "Gnar",
-    "gnar",
-    "나르"
+    "gnar"
   ],
   "gragas": [
+    "그라가스",
     "Gragas",
-    "gragas",
-    "그라가스"
+    "gragas"
   ],
   "graves": [
+    "그레이브즈",
     "Graves",
-    "graves",
-    "그레이브즈"
+    "graves"
   ],
   "gwen": [
+    "그웬",
     "Gwen",
-    "gwen",
-    "그웬"
+    "gwen"
   ],
   "hecarim": [
+    "헤카림",
     "Hecarim",
-    "hecarim",
-    "헤카림"
+    "hecarim"
   ],
   "heimerdinger": [
+    "하이머딩거",
     "Heimerdinger",
-    "heimerdinger",
-    "하이머딩거"
+    "heimerdinger"
   ],
   "hwei": [
+    "흐웨이",
     "Hwei",
-    "hwei",
-    "흐웨이"
+    "hwei"
   ],
   "illaoi": [
+    "일라오이",
     "Illaoi",
-    "illaoi",
-    "일라오이"
+    "illaoi"
   ],
   "irelia": [
+    "이렐리아",
     "Irelia",
-    "irelia",
-    "이렐리아"
+    "irelia"
   ],
   "ivern": [
+    "아이번",
     "Ivern",
-    "ivern",
-    "아이번"
+    "ivern"
   ],
   "janna": [
+    "잔나",
     "Janna",
-    "janna",
-    "잔나"
+    "janna"
   ],
   "jarvaniv": [
+    "자르반 4세",
     "Jarvan IV",
     "jarvan iv",
+    "JarvanIV",
     "jarvaniv",
-    "자르반 4세",
     "자르반4세"
   ],
   "jax": [
+    "잭스",
     "Jax",
-    "jax",
-    "잭스"
+    "jax"
   ],
   "jayce": [
+    "제이스",
     "Jayce",
-    "jayce",
-    "제이스"
+    "jayce"
   ],
   "jhin": [
+    "진",
     "Jhin",
-    "jhin",
-    "진"
+    "jhin"
   ],
   "jinx": [
+    "징크스",
     "Jinx",
-    "jinx",
-    "징크스"
+    "jinx"
   ],
   "kaisa": [
+    "카이사",
     "Kai'Sa",
     "kai'sa",
-    "kaisa",
-    "카이사"
+    "Kaisa",
+    "kaisa"
   ],
   "kalista": [
+    "칼리스타",
     "Kalista",
-    "kalista",
-    "칼리스타"
+    "kalista"
   ],
   "karma": [
+    "카르마",
     "Karma",
-    "karma",
-    "카르마"
+    "karma"
   ],
   "karthus": [
+    "카서스",
     "Karthus",
-    "karthus",
-    "카서스"
+    "karthus"
   ],
   "kassadin": [
+    "카사딘",
     "Kassadin",
-    "kassadin",
-    "카사딘"
+    "kassadin"
   ],
   "katarina": [
+    "카타리나",
     "Katarina",
-    "katarina",
-    "카타리나"
+    "katarina"
   ],
   "kayle": [
+    "케일",
     "Kayle",
-    "kayle",
-    "케일"
+    "kayle"
   ],
   "kayn": [
+    "케인",
     "Kayn",
-    "kayn",
-    "케인"
+    "kayn"
   ],
   "kennen": [
+    "케넨",
     "Kennen",
-    "kennen",
-    "케넨"
+    "kennen"
   ],
   "khazix": [
+    "카직스",
     "Kha'Zix",
     "kha'zix",
-    "khazix",
-    "카직스"
+    "Khazix",
+    "khazix"
   ],
   "kindred": [
+    "킨드레드",
     "Kindred",
-    "kindred",
-    "킨드레드"
+    "kindred"
   ],
   "kled": [
+    "클레드",
     "Kled",
-    "kled",
-    "클레드"
+    "kled"
   ],
   "kogmaw": [
+    "코그모",
     "Kog'Maw",
     "kog'maw",
-    "kogmaw",
-    "코그모"
+    "KogMaw",
+    "kogmaw"
   ],
   "ksante": [
+    "크산테",
     "K'Sante",
     "k'sante",
-    "ksante",
-    "크산테"
+    "KSante",
+    "ksante"
   ],
   "leblanc": [
+    "르블랑",
     "LeBlanc",
-    "leblanc",
-    "르블랑"
+    "Leblanc",
+    "leblanc"
   ],
   "leesin": [
+    "리 신",
     "Lee Sin",
     "lee sin",
+    "LeeSin",
     "leesin",
-    "리 신",
     "리신"
   ],
   "leona": [
+    "레오나",
     "Leona",
-    "leona",
-    "레오나"
+    "leona"
   ],
   "lillia": [
+    "릴리아",
     "Lillia",
-    "lillia",
-    "릴리아"
+    "lillia"
   ],
   "lissandra": [
+    "리산드라",
     "Lissandra",
-    "lissandra",
-    "리산드라"
+    "lissandra"
+  ],
+  "locke": [
+    "로크",
+    "Locke",
+    "locke"
   ],
   "lucian": [
+    "루시안",
     "Lucian",
-    "lucian",
-    "루시안"
+    "lucian"
   ],
   "lulu": [
+    "룰루",
     "Lulu",
-    "lulu",
-    "룰루"
+    "lulu"
   ],
   "lux": [
+    "럭스",
     "Lux",
-    "lux",
-    "럭스"
+    "lux"
   ],
   "malphite": [
+    "말파이트",
     "Malphite",
-    "malphite",
-    "말파이트"
+    "malphite"
   ],
   "malzahar": [
+    "말자하",
     "Malzahar",
-    "malzahar",
-    "말자하"
+    "malzahar"
   ],
   "maokai": [
+    "마오카이",
     "Maokai",
-    "maokai",
-    "마오카이"
+    "maokai"
   ],
   "masteryi": [
+    "마스터 이",
     "Master Yi",
     "master yi",
+    "MasterYi",
     "masteryi",
-    "마스터 이",
     "마스터이"
   ],
   "mel": [
+    "멜",
     "Mel",
-    "mel",
-    "멜"
+    "mel"
   ],
   "milio": [
+    "밀리오",
     "Milio",
-    "milio",
-    "밀리오"
+    "milio"
   ],
   "missfortune": [
+    "미스 포츈",
     "Miss Fortune",
     "miss fortune",
+    "MissFortune",
     "missfortune",
-    "미스 포츈",
     "미스포츈"
   ],
   "mordekaiser": [
+    "모데카이저",
     "Mordekaiser",
-    "mordekaiser",
-    "모데카이저"
+    "mordekaiser"
   ],
   "morgana": [
+    "모르가나",
     "Morgana",
-    "morgana",
-    "모르가나"
+    "morgana"
   ],
   "naafiri": [
+    "나피리",
     "Naafiri",
-    "naafiri",
-    "나피리"
+    "naafiri"
   ],
   "nami": [
+    "나미",
     "Nami",
-    "nami",
-    "나미"
+    "nami"
   ],
   "nasus": [
+    "나서스",
     "Nasus",
-    "nasus",
-    "나서스"
+    "nasus"
   ],
   "nautilus": [
+    "노틸러스",
     "Nautilus",
-    "nautilus",
-    "노틸러스"
+    "nautilus"
   ],
   "neeko": [
+    "니코",
     "Neeko",
-    "neeko",
-    "니코"
+    "neeko"
   ],
   "nidalee": [
+    "니달리",
     "Nidalee",
-    "nidalee",
-    "니달리"
+    "nidalee"
   ],
   "nilah": [
+    "닐라",
     "Nilah",
-    "nilah",
-    "닐라"
+    "nilah"
   ],
   "nocturne": [
+    "녹턴",
     "Nocturne",
-    "nocturne",
-    "녹턴"
+    "nocturne"
   ],
   "nunu": [
+    "누누와 윌럼프",
+    "Nunu",
     "nunu",
     "Nunu & Willump",
     "nunu & willump",
     "nunuwillump",
-    "누누와 윌럼프",
     "누누와윌럼프"
   ],
   "olaf": [
+    "올라프",
     "Olaf",
-    "olaf",
-    "올라프"
+    "olaf"
   ],
   "orianna": [
+    "오리아나",
     "Orianna",
-    "orianna",
-    "오리아나"
+    "orianna"
   ],
   "ornn": [
+    "오른",
     "Ornn",
-    "ornn",
-    "오른"
+    "ornn"
   ],
   "pantheon": [
+    "판테온",
     "Pantheon",
-    "pantheon",
-    "판테온"
+    "pantheon"
   ],
   "poppy": [
+    "뽀삐",
     "Poppy",
-    "poppy",
-    "뽀삐"
+    "poppy"
   ],
   "pyke": [
+    "파이크",
     "Pyke",
-    "pyke",
-    "파이크"
+    "pyke"
   ],
   "qiyana": [
+    "키아나",
     "Qiyana",
-    "qiyana",
-    "키아나"
+    "qiyana"
   ],
   "quinn": [
+    "퀸",
     "Quinn",
-    "quinn",
-    "퀸"
+    "quinn"
   ],
   "rakan": [
+    "라칸",
     "Rakan",
-    "rakan",
-    "라칸"
+    "rakan"
   ],
   "rammus": [
+    "람머스",
     "Rammus",
-    "rammus",
-    "람머스"
+    "rammus"
   ],
   "reksai": [
+    "렉사이",
     "Rek'Sai",
     "rek'sai",
-    "reksai",
-    "렉사이"
+    "RekSai",
+    "reksai"
   ],
   "rell": [
+    "렐",
     "Rell",
-    "rell",
-    "렐"
+    "rell"
   ],
   "renata": [
+    "레나타 글라스크",
+    "Renata",
     "renata",
     "Renata Glasc",
     "renata glasc",
     "renataglasc",
-    "레나타 글라스크",
     "레나타글라스크"
   ],
   "renekton": [
+    "레넥톤",
     "Renekton",
-    "renekton",
-    "레넥톤"
+    "renekton"
   ],
   "rengar": [
+    "렝가",
     "Rengar",
-    "rengar",
-    "렝가"
+    "rengar"
   ],
   "riven": [
+    "리븐",
     "Riven",
-    "riven",
-    "리븐"
+    "riven"
   ],
   "rumble": [
+    "럼블",
     "Rumble",
-    "rumble",
-    "럼블"
+    "rumble"
   ],
   "ryze": [
+    "라이즈",
     "Ryze",
-    "ryze",
-    "라이즈"
+    "ryze"
   ],
   "samira": [
+    "사미라",
     "Samira",
-    "samira",
-    "사미라"
+    "samira"
   ],
   "sejuani": [
+    "세주아니",
     "Sejuani",
-    "sejuani",
-    "세주아니"
+    "sejuani"
   ],
   "senna": [
+    "세나",
     "Senna",
-    "senna",
-    "세나"
+    "senna"
   ],
   "seraphine": [
+    "세라핀",
     "Seraphine",
-    "seraphine",
-    "세라핀"
+    "seraphine"
   ],
   "sett": [
+    "세트",
     "Sett",
-    "sett",
-    "세트"
+    "sett"
   ],
   "shaco": [
+    "샤코",
     "Shaco",
-    "shaco",
-    "샤코"
+    "shaco"
   ],
   "shen": [
+    "쉔",
     "Shen",
-    "shen",
-    "쉔"
+    "shen"
   ],
   "shyvana": [
+    "쉬바나",
     "Shyvana",
-    "shyvana",
-    "쉬바나"
+    "shyvana"
   ],
   "singed": [
+    "신지드",
     "Singed",
-    "singed",
-    "신지드"
+    "singed"
   ],
   "sion": [
+    "사이온",
     "Sion",
-    "sion",
-    "사이온"
+    "sion"
   ],
   "sivir": [
+    "시비르",
     "Sivir",
-    "sivir",
-    "시비르"
+    "sivir"
   ],
   "skarner": [
+    "스카너",
     "Skarner",
-    "skarner",
-    "스카너"
+    "skarner"
   ],
   "smolder": [
+    "스몰더",
     "Smolder",
-    "smolder",
-    "스몰더"
+    "smolder"
   ],
   "sona": [
+    "소나",
     "Sona",
-    "sona",
-    "소나"
+    "sona"
   ],
   "soraka": [
+    "소라카",
     "Soraka",
-    "soraka",
-    "소라카"
+    "soraka"
   ],
   "swain": [
+    "스웨인",
     "Swain",
-    "swain",
-    "스웨인"
+    "swain"
   ],
   "sylas": [
+    "사일러스",
     "Sylas",
-    "sylas",
-    "사일러스"
+    "sylas"
   ],
   "syndra": [
+    "신드라",
     "Syndra",
-    "syndra",
-    "신드라"
+    "syndra"
   ],
   "tahmkench": [
+    "탐 켄치",
     "Tahm Kench",
     "tahm kench",
+    "TahmKench",
     "tahmkench",
-    "탐 켄치",
     "탐켄치"
   ],
   "taliyah": [
+    "탈리야",
     "Taliyah",
-    "taliyah",
-    "탈리야"
+    "taliyah"
   ],
   "talon": [
+    "탈론",
     "Talon",
-    "talon",
-    "탈론"
+    "talon"
   ],
   "taric": [
+    "타릭",
     "Taric",
-    "taric",
-    "타릭"
+    "taric"
   ],
   "teemo": [
+    "티모",
     "Teemo",
-    "teemo",
-    "티모"
+    "teemo"
   ],
   "thresh": [
+    "쓰레쉬",
     "Thresh",
-    "thresh",
-    "쓰레쉬"
+    "thresh"
   ],
   "tristana": [
+    "트리스타나",
     "Tristana",
-    "tristana",
-    "트리스타나"
+    "tristana"
   ],
   "trundle": [
+    "트런들",
     "Trundle",
-    "trundle",
-    "트런들"
+    "trundle"
   ],
   "tryndamere": [
+    "트린다미어",
     "Tryndamere",
-    "tryndamere",
-    "트린다미어"
+    "tryndamere"
   ],
   "twistedfate": [
+    "트위스티드 페이트",
     "Twisted Fate",
     "twisted fate",
+    "TwistedFate",
     "twistedfate",
-    "트위스티드 페이트",
     "트위스티드페이트"
   ],
   "twitch": [
+    "트위치",
     "Twitch",
-    "twitch",
-    "트위치"
+    "twitch"
   ],
   "udyr": [
+    "우디르",
     "Udyr",
-    "udyr",
-    "우디르"
+    "udyr"
   ],
   "urgot": [
+    "우르곳",
     "Urgot",
-    "urgot",
-    "우르곳"
+    "urgot"
   ],
   "varus": [
+    "바루스",
     "Varus",
-    "varus",
-    "바루스"
+    "varus"
   ],
   "vayne": [
+    "베인",
     "Vayne",
-    "vayne",
-    "베인"
+    "vayne"
   ],
   "veigar": [
+    "베이가",
     "Veigar",
-    "veigar",
-    "베이가"
+    "veigar"
   ],
   "velkoz": [
+    "벨코즈",
     "Vel'Koz",
     "vel'koz",
-    "velkoz",
-    "벨코즈"
+    "Velkoz",
+    "velkoz"
   ],
   "vex": [
+    "벡스",
     "Vex",
-    "vex",
-    "벡스"
+    "vex"
   ],
   "vi": [
+    "바이",
     "Vi",
-    "vi",
-    "바이"
+    "vi"
   ],
   "viego": [
+    "비에고",
     "Viego",
-    "viego",
-    "비에고"
+    "viego"
   ],
   "viktor": [
+    "빅토르",
     "Viktor",
-    "viktor",
-    "빅토르"
+    "viktor"
   ],
   "vladimir": [
+    "블라디미르",
     "Vladimir",
-    "vladimir",
-    "블라디미르"
+    "vladimir"
   ],
   "volibear": [
+    "볼리베어",
     "Volibear",
-    "volibear",
-    "볼리베어"
+    "volibear"
   ],
   "warwick": [
+    "워윅",
     "Warwick",
-    "warwick",
-    "워윅"
+    "warwick"
   ],
   "wukong": [
+    "오공",
+    "MonkeyKing",
+    "monkeyking",
     "Wukong",
-    "wukong",
-    "오공"
+    "wukong"
   ],
   "xayah": [
+    "자야",
     "Xayah",
-    "xayah",
-    "자야"
+    "xayah"
   ],
   "xerath": [
+    "제라스",
     "Xerath",
-    "xerath",
-    "제라스"
+    "xerath"
   ],
   "xinzhao": [
+    "신 짜오",
     "Xin Zhao",
     "xin zhao",
+    "XinZhao",
     "xinzhao",
-    "신 짜오",
     "신짜오"
   ],
   "yasuo": [
+    "야스오",
     "Yasuo",
-    "yasuo",
-    "야스오"
+    "yasuo"
   ],
   "yone": [
+    "요네",
     "Yone",
-    "yone",
-    "요네"
+    "yone"
   ],
   "yorick": [
+    "요릭",
     "Yorick",
-    "yorick",
-    "요릭"
+    "yorick"
   ],
   "yunara": [
+    "유나라",
     "Yunara",
-    "yunara",
-    "유나라"
+    "yunara"
   ],
   "yuumi": [
+    "유미",
     "Yuumi",
-    "yuumi",
-    "유미"
+    "yuumi"
   ],
   "zaahen": [
+    "자헨",
     "Zaahen",
-    "zaahen",
-    "자헨"
+    "zaahen"
   ],
   "zac": [
+    "자크",
     "Zac",
-    "zac",
-    "자크"
+    "zac"
   ],
   "zed": [
+    "제드",
     "Zed",
-    "zed",
-    "제드"
+    "zed"
   ],
   "zeri": [
+    "제리",
     "Zeri",
-    "zeri",
-    "제리"
+    "zeri"
   ],
   "ziggs": [
+    "직스",
     "Ziggs",
-    "ziggs",
-    "직스"
+    "ziggs"
   ],
   "zilean": [
+    "질리언",
     "Zilean",
-    "zilean",
-    "질리언"
+    "zilean"
   ],
   "zoe": [
+    "조이",
     "Zoe",
-    "zoe",
-    "조이"
+    "zoe"
   ],
   "zyra": [
+    "자이라",
     "Zyra",
-    "zyra",
-    "자이라"
+    "zyra"
   ]
 }

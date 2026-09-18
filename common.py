@@ -10,6 +10,11 @@ LOW_SAMPLE_COLOR = "#888888"
 NORMAL_SAMPLE_COLOR = "#111111"
 WARNING_ICON = "⚠"
 
+def resolve_writable_path(filename: str) -> str:
+    """User settings must survive one-file executable extraction/cleanup."""
+    base = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, filename)
+
 def resolve_resource_path(*path_parts: str) -> str:
     relative_path = os.path.join(*path_parts)
     candidates = []
@@ -37,11 +42,12 @@ def resolve_resource_path(*path_parts: str) -> str:
     return candidates[0]
 
 class AutocompletePopup:
-    def __init__(self, entry_widget, values_provider, on_select=None, max_results=8):
+    def __init__(self, entry_widget, values_provider, on_select=None, max_results=8, display_formatter=None):
         self.entry = entry_widget
         self.values_provider = values_provider
         self.on_select = on_select
         self.max_results = max_results
+        self.display_formatter = display_formatter or (lambda value: value)
         self.popup = None
         self.listbox = None
         self.hide_job = None
@@ -128,11 +134,10 @@ class AutocompletePopup:
                 add_unique(word_matches, value)
                 continue
 
-            if len(prefix_matches) + len(word_matches) >= self.max_results:
-                break
-
         combined = prefix_matches + word_matches
-        return combined[:self.max_results]
+        # Search English names and nicknames, but show each official name once.
+        formatted = dict.fromkeys(self.display_formatter(value) for value in combined)
+        return list(formatted)[:self.max_results]
 
     def _ensure_popup(self):
         if self.popup and self.popup.winfo_exists():
@@ -333,4 +338,3 @@ class ScoreTooltip:
     def update_text_provider(self, text_provider):
         """텍스트 제공자 업데이트"""
         self.text_provider = text_provider
-
